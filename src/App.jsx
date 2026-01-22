@@ -1,4 +1,6 @@
 import Chatbot from '@/components/Chatbot';
+import { ToastContainer, Bounce } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
 
@@ -9,6 +11,20 @@ function App() {
           <h1 className='font-urbanist text-[1.65rem] font-semibold'>Martin Sven Kovačić AI powered portfolio</h1>
         </div>
       </header>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+        transition={Bounce}
+      />
+      <ToastContainer />
       <Chatbot />
     </div>
   );

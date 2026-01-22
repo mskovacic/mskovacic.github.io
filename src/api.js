@@ -1,3 +1,5 @@
+import { toast } from 'react-toastify';
+
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 async function createChat() {
@@ -14,19 +16,34 @@ async function createChat() {
 }
 
 async function sendChatMessage(messages) {
-  const inputMessages = messages.toSpliced(0, messages.length-20).map(msg => ({
+  const inputMessages = messages.toSpliced(0, messages.length - 20).map(msg => ({
     type: 'message',
     role: msg.role,
     content: msg.content
   }));
-  const res = await fetch(BASE_URL + `/responses`, {
+  const res = await fetch(BASE_URL + `/responses?subscription-key=7e54d6f30b864cf598d34d39e931932b`, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain', 'api-key': '7e54d6f30b864cf598d34d39e931932b' },
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify(inputMessages)
   });
   if (!res.ok) {
+    if (res.status === 429) {
+      const time = res.headers.get('Retry-After');
+      toast.error(`Request limit reached! Please try-again in ${time} seconds!`, {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+      });
+    }
+
     return Promise.reject({ status: res.status, data: await res.json() });
   }
+
   return res.body;
 }
 
