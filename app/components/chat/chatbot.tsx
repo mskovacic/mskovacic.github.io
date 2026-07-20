@@ -1,26 +1,31 @@
+"use client";
+
 import { useEffect } from 'react';
 import { useImmer } from 'use-immer';
-import api from '@/api';
-import { parseSSEStream } from '@/utils';
-import ChatMessages from '@/components/ChatMessages';
-import ChatInput from '@/components/ChatInput';
+import api from '~/helpers/api';
+import { parseSSEStream } from '~/helpers/utils';
+import ChatMessages from '~/components/chat/chatMessages';
+import ChatInput from '~/components/chat/chatInput';
 
-const getMessages = () => JSON.parse(localStorage.getItem('messages')) || [];
+function getMessages() {
+  if (typeof window === 'undefined') return [];
+  return JSON.parse(globalThis.localStorage.getItem('messages') ?? "[]") || [];
+}
 
-function Chatbot() {
+export default function Chatbot() {
   const [messages, setMessages] = useImmer(getMessages());
 
   useEffect(() => {
-    localStorage.setItem('messages', JSON.stringify(messages));
+    globalThis.localStorage.setItem('messages', JSON.stringify(messages));
   }, [messages]);
 
   const isLoading = messages.length && messages[messages.length - 1].loading;
 
-  async function submitNewMessage(newMessage) {
+  async function submitNewMessage(newMessage: string) {
     const trimmedMessage = newMessage.trim();
     if (!trimmedMessage || isLoading) return;
 
-    setMessages(draft => [...draft,
+    setMessages((draft: any) => [...draft,
       { role: 'user', content: trimmedMessage },
       { role: 'assistant', content: '', sources: [], loading: true }
     ]);
@@ -31,25 +36,25 @@ function Chatbot() {
         const responseObject = JSON.parse(textChunk);
         if (responseObject.type == "response.output_text.delta")
         {
-          setMessages(draft => {
-            draft[draft.length - 1].content += responseObject.delta;
+          setMessages((draft: string | any[]) => {
+            draft.at(-1).content += responseObject.delta;
           });
         }      
       }
-      setMessages(draft => {
-        draft[draft.length - 1].loading = false;
+      setMessages((draft: string | any[]) => {
+        draft.at(-1).loading = false;
       });
     } catch (err) {
       console.log(err);
-      setMessages(draft => {
-        draft[draft.length - 1].loading = false;
-        draft[draft.length - 1].error = true;
+      setMessages((draft: string | any[]) => {
+        draft.at(-1).loading = false;
+        draft.at(-1).error = true;
       });
     }
   }
 
-  function deleteMessage(index) {
-    setMessages(draft => {
+  function deleteMessage(index: any) {
+    setMessages((draft: any[]) => {
       draft.splice(index, 1);
     });
   }
@@ -91,5 +96,3 @@ function Chatbot() {
     </div>
   );
 }
-
-export default Chatbot;

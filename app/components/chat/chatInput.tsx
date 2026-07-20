@@ -1,13 +1,15 @@
-import useAutosize from '@/hooks/useAutosize';
-import { useState } from 'react';
-import sendIcon from '@/assets/images/send.svg';
+"use client";
 
-function ChatInput({ newMessage, isLoading, submitNewMessage }) {
+import useAutosize from '~/hooks/useAutosize';
+import { useState } from 'react';
+import sendIcon from '~/assets/images/send.svg';
+
+export default function ChatInput({ newMessage, isLoading, submitNewMessage }: Readonly<{ newMessage: string, isLoading: boolean, submitNewMessage: (message: string) => void }>) {
   const [prompt, setPrompt] = useState(newMessage);
   const textareaRef = useAutosize(newMessage);
 
-  function handleKeyDown(e) {
-    if(e.keyCode === 13 && !e.shiftKey && !isLoading) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if(e.key === 'Enter' && !e.shiftKey && !isLoading) {
       e.preventDefault();
       mySubmit();
     }
@@ -25,7 +27,7 @@ function ChatInput({ newMessage, isLoading, submitNewMessage }) {
           <textarea
             className='block w-full max-h-[140px] py-2 px-4 pr-11 bg-white rounded-3xl resize-none placeholder:text-primary-blue placeholder:leading-4 placeholder:-translate-y-1 sm:placeholder:leading-normal sm:placeholder:translate-y-0 focus:outline-hidden'
             ref={textareaRef}
-            rows='1'
+            rows={1}
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -43,5 +45,3 @@ function ChatInput({ newMessage, isLoading, submitNewMessage }) {
     </div>
   );
 }
-
-export default ChatInput;

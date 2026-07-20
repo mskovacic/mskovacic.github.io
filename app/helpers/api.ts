@@ -1,6 +1,6 @@
 import { toast } from 'react-toastify';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = import.meta.env.API_URL;
 
 async function createChat() {
   const res = await fetch(BASE_URL + '/threads?api-version=2025-03-01-preview', {
@@ -16,6 +16,8 @@ async function createChat() {
 }
 
 async function sendChatMessage(messages) {
+
+  console.log({ url: import.meta.env.API_URL, env: import.meta.env });
   const inputMessages = messages.toSpliced(0, messages.length - 20).map(msg => ({
     type: 'message',
     role: msg.role,

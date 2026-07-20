@@ -1,13 +1,33 @@
+"use client";
+
 import Markdown from 'react-markdown';
-import useAutoScroll from '@/hooks/useAutoScroll';
-import Spinner from '@/components/Spinner';
-import userIcon from '@/assets/images/user.svg';
-import errorIcon from '@/assets/images/error.svg';
-import deleteIcon from '@/assets/images/delete_24.svg';
+import useAutoScroll from '~/hooks/useAutoScroll';
+import Spinner from '~/components/spinner';
+import userIcon from '~/assets/images/user.svg';
+import errorIcon from '~/assets/images/error.svg';
+import deleteIcon from '~/assets/images/delete_24.svg';
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 
-function ChatMessages({ messages, isLoading, deleteMessage }) {
+function MarkdownContainer(loading: boolean | undefined, content: string, role: string) {
+  if (loading && !content) {
+    return <Spinner />;
+  } else if (role === 'assistant') {
+    return (
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
+        remarkRehypeOptions={{ passThrough: ['link'] }}
+      >
+        {content}
+      </Markdown>
+    );
+  } else {
+    return <div className='whitespace-pre-line'>{content}</div>;
+  }
+}
+
+export default function ChatMessages({ messages, isLoading, deleteMessage } : Readonly<{ messages: Array<{ role: string, content: string, loading?: boolean, error?: boolean }>, isLoading: boolean, deleteMessage: (index: number) => void }>) {
   const scrollContentRef = useAutoScroll(isLoading);
   
   return (
@@ -30,15 +50,7 @@ function ChatMessages({ messages, isLoading, deleteMessage }) {
                 </div>
               ) : (
                 <div className='markdown-container' >
-                  {(loading && !content) ? 
-                    <Spinner />
-                    : (role === 'assistant') ? 
-                      <Markdown 
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw]}
-                        remarkRehypeOptions={{ passThrough: ['link'] }}>{content}</Markdown>
-                      : <div className='whitespace-pre-line'>{content}</div>
-                  }
+                  {MarkdownContainer(loading, content, role)}
                 </div>
               )}
             </div>
@@ -51,5 +63,3 @@ function ChatMessages({ messages, isLoading, deleteMessage }) {
     </div>
   );
 }
-
-export default ChatMessages;
