@@ -1,4 +1,5 @@
 import { toast } from 'react-toastify';
+import type ChatMessage from '~/dtos/chatMessage';
 
 const BASE_URL = 'https://msk-portfolio-apim.azure-api.net/basic/openai';
 
@@ -15,12 +16,14 @@ async function createChat() {
   return data;
 }
 
-async function sendChatMessage(messages) {
-  const inputMessages = messages.toSpliced(0, messages.length - 20).map(msg => ({
-    type: 'message',
-    role: msg.role,
-    content: msg.content
-  }));
+async function sendChatMessage(messages: ChatMessage[]) {
+  const inputMessages = messages
+    .toSpliced(0, messages.length - 20)
+    .map(msg => ({
+      type: 'message',
+      role: msg.role,
+      content: msg.content
+    }));
   const res = await fetch(BASE_URL + `/responses?subscription-key=7e54d6f30b864cf598d34d39e931932b`, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
@@ -41,13 +44,13 @@ async function sendChatMessage(messages) {
       });
     }
 
-    return Promise.reject({ status: res.status, data: await res.json() });
+    throw new Error(`Request failed with status ${res.status} ${res.statusText} ${await res.json()}`);
   }
 
   return res.body;
 }
 
-async function getChatMessages(chatId) {
+async function getChatMessages(chatId: string) {
   const res = await fetch(BASE_URL + `/threads/${chatId}/messages?api-version=2025-03-01-preview&limit=20&order=desc`);
   if (!res.ok) {
     return Promise.reject({ status: res.status, data: await res.json() });

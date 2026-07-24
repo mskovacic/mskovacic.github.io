@@ -1,5 +1,5 @@
 import Chatbot from '~/components/chat/chatbot';
-import { type Route } from './+types/chat';
+// import { type Route } from './+types/chat';
 import { ToastContainer, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 

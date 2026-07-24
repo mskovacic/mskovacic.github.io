@@ -32,7 +32,9 @@ export default defineConfig([
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
-      ]
+      ],
+      "no-undef": "off",
+      "no-unused-vars": "off"
     },
     extends: [
       js.configs.recommended,

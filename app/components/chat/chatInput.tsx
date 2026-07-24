@@ -2,7 +2,13 @@ import useAutosize from '~/hooks/useAutosize';
 import { useState } from 'react';
 import sendIcon from '~/assets/images/send.svg';
 
-export default function ChatInput({ newMessage, isLoading, submitNewMessage }: Readonly<{ newMessage: string, isLoading: boolean, submitNewMessage: (message: string) => void }>) {
+type ChatInputProps = {
+  newMessage: string;
+  isLoading: boolean;
+  submitNewMessage: (message: string) => void;
+};
+
+export default function ChatInput({ newMessage, isLoading, submitNewMessage }: Readonly<ChatInputProps>) {
   const [prompt, setPrompt] = useState(newMessage);
   const textareaRef = useAutosize(newMessage);
 

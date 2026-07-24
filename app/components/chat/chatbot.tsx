@@ -4,8 +4,9 @@ import api from '~/helpers/api';
 import { parseSSEStream } from '~/helpers/utils';
 import ChatMessages from '~/components/chat/chatMessages';
 import ChatInput from '~/components/chat/chatInput';
+import type ChatMessage from '~/dtos/chatMessage';
 
-function getMessages() {
+function getMessages(): ChatMessage[] {
   if (typeof window === 'undefined') return [];
   return JSON.parse(globalThis.localStorage.getItem('messages') ?? "[]") || [];
 }
@@ -17,15 +18,15 @@ export default function Chatbot() {
     globalThis.localStorage.setItem('messages', JSON.stringify(messages));
   }, [messages]);
 
-  const isLoading = messages.length && messages[messages.length - 1].loading;
+  const isLoading = messages.at(-1)?.loading ?? false;
 
   async function submitNewMessage(newMessage: string) {
     const trimmedMessage = newMessage.trim();
     if (!trimmedMessage || isLoading) return;
 
-    setMessages((draft: any) => [...draft,
-      { role: 'user', content: trimmedMessage },
-      { role: 'assistant', content: '', sources: [], loading: true }
+    setMessages((draft: ChatMessage[]) => [...draft,
+      { role: 'user', content: trimmedMessage, id: draft.length.toString() },
+      { role: 'assistant', content: '', sources: [], loading: true, id: (draft.length + 1).toString() }
     ]);
 
     try {
@@ -34,25 +35,37 @@ export default function Chatbot() {
         const responseObject = JSON.parse(textChunk);
         if (responseObject.type == "response.output_text.delta")
         {
-          setMessages((draft: string | any[]) => {
-            draft.at(-1).content += responseObject.delta;
+          setMessages((draft: ChatMessage[]) => {
+            const message = draft.at(-1);
+            if (message) {
+              message.content += responseObject.delta;
+            }
           });
-        }      
+        } else if (responseObject.type == "response.completed") {
+          setMessages((draft: ChatMessage[]) => {
+            const message = draft.at(-1);
+            if (message) {
+              message.loading = false;
+              message.model = responseObject.response.model;
+              message.tokens = responseObject.response.usage?.total_tokens;
+            }
+          });
+        }     
       }
-      setMessages((draft: string | any[]) => {
-        draft.at(-1).loading = false;
-      });
     } catch (err) {
-      console.log(err);
-      setMessages((draft: string | any[]) => {
-        draft.at(-1).loading = false;
-        draft.at(-1).error = true;
+      console.error(err);
+      setMessages((draft: ChatMessage[]) => {
+        const message = draft.at(-1);
+        if (message) {
+          message.loading = false;
+          message.error = true;
+        }
       });
     }
   }
 
-  function deleteMessage(index: any) {
-    setMessages((draft: any[]) => {
+  function deleteMessage(index: number) {
+    setMessages((draft: ChatMessage[]) => {
       draft.splice(index, 1);
     });
   }

@@ -6,6 +6,7 @@ import errorIcon from '~/assets/images/error.svg';
 import deleteIcon from '~/assets/images/delete_24.svg';
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
+import type ChatMessage from '~/dtos/chatMessage';
 
 function MarkdownContainer(loading: boolean | undefined, content: string, role: string) {
   if (loading && !content) {
@@ -25,13 +26,13 @@ function MarkdownContainer(loading: boolean | undefined, content: string, role: 
   }
 }
 
-export default function ChatMessages({ messages, isLoading, deleteMessage } : Readonly<{ messages: Array<{ role: string, content: string, loading?: boolean, error?: boolean }>, isLoading: boolean, deleteMessage: (index: number) => void }>) {
+export default function ChatMessages({ messages, isLoading, deleteMessage } : Readonly<{ messages: ChatMessage[], isLoading: boolean, deleteMessage: (index: number) => void }>) {
   const scrollContentRef = useAutoScroll(isLoading);
   
   return (
     <div ref={scrollContentRef} className='grow space-y-4'>
-      {messages.map(({ role, content, loading, error }, idx) => (
-        <div key={idx} className={`message flex items-start gap-4 py-4 px-3 rounded-xl ${role === 'user' ? 'bg-primary-blue/10' : ''}`}>
+      {messages.map(({ role, content, loading, error, id }, idx) => (
+        <div key={`message-${id || idx}`} className={`message flex items-start gap-4 py-4 px-3 rounded-xl ${role === 'user' ? 'bg-primary-blue/10' : ''}`}>
           {role === 'user' && (
             <img
               className='h-[26px] w-[26px] shrink-0'
