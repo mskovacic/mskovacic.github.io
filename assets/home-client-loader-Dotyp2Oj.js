@@ -1,0 +1,1 @@
+function e({params:e}){return{name:`React Router`}}export{e as clientLoader};
