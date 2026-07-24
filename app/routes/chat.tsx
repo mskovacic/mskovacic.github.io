@@ -3,15 +3,7 @@ import { type Route } from './+types/chat';
 import { ToastContainer, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-export function meta({ }: Route.MetaArgs) {
-    return [
-        { title: "New React Router App" },
-        { name: "description", content: "Welcome to React Router!" },
-    ];
-}
-
 export default function Chat() {
-
     return (
         <div className='flex flex-col min-h-full w-full max-w-3xl mx-auto px-4'>
             <ToastContainer

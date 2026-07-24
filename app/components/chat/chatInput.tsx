@@ -1,5 +1,3 @@
-"use client";
-
 import useAutosize from '~/hooks/useAutosize';
 import { useState } from 'react';
 import sendIcon from '~/assets/images/send.svg';

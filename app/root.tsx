@@ -9,7 +9,7 @@ import {
 } from "react-router";
 import { type Route } from "./+types/root";
 import "./app.css";
-import MyAppBar from "./components/mainAppBar";
+import MainAppBar from "./components/mainAppBar";
 import { useEffect, useRef } from "react";
 import { faro } from '@grafana/faro-react';
 
@@ -21,16 +21,16 @@ export function Layout({ children }: Readonly<{ children: React.ReactNode }>) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" type="image/x-icon" href="/favicon.ico"></link>
         <Meta />
-        <meta name="description" content="TMartin Sven Kovačić AI powered portfolio. To demonstrate my skill and provide answers based on my real knowledge and experiences." />
+        <meta name="description" content="Martin Sven Kovačić AI powered portfolio. To demonstrate my skill and provide answers based on my real knowledge and experiences." />
 
         <meta property="og:title" content="Martin Sven Kovačić AI powered portfolio" />
         <meta property="og:description" content="Martin Sven Kovačić AI powered portfolio. To demonstrate my skill and provide answers based on my real knowledge and experiences." />
         <meta property="og:url" content="https://mskovacic.github.io" />
         <meta property="og:site_name" content="MSKovacic" />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="https://mskovacic.github.io/public/profile.webp" />
+        <meta property="og:image" content="https://mskovacic.github.io/profile.webp" />
 
-        <meta name="twitter:image" content="https://mskovacic.github.io/public/profile.webp" />
+        <meta name="twitter:image" content="https://mskovacic.github.io/profile.webp" />
         <meta name="twitter:url" content="https://mskovacic.github.io" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Martin Sven Kovačić AI powered portfolio" />
@@ -38,7 +38,7 @@ export function Layout({ children }: Readonly<{ children: React.ReactNode }>) {
         <Links />
       </head>
       <body>
-        <MyAppBar />
+        <MainAppBar />
         {children}
         <ScrollRestoration />
         <Scripts />

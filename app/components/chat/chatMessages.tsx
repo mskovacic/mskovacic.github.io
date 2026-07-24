@@ -1,5 +1,3 @@
-"use client";
-
 import Markdown from 'react-markdown';
 import useAutoScroll from '~/hooks/useAutoScroll';
 import Spinner from '~/components/spinner';

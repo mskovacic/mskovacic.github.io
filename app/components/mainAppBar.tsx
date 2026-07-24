@@ -14,13 +14,13 @@ import MenuItem from '@mui/material/MenuItem';
 import { NavLink, Link } from "react-router";
 
 const pages: { page: string, path: string }[] = [
-  { page: 'Chat', path: '/chat' },
   { page: 'Home', path: '/' },
+  { page: 'Welcome', path: '/welcome' },
   { page: 'Other', path: '/other' }
 ];
 const settings = ['Profile', 'Account', 'Dashboard', 'Logout'];
 
-function MyAppBar() {
+function MainAppBar() {
   const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(null);
   const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
 
@@ -40,7 +40,7 @@ function MyAppBar() {
   };
 
   return (
-    <AppBar position="static">
+    <AppBar position="sticky"s>
       <Container maxWidth="xl">
         <Toolbar disableGutters>
           <IconButton
@@ -172,4 +172,4 @@ function MyAppBar() {
     </AppBar>
   );
 }
-export default MyAppBar;
+export default MainAppBar;
