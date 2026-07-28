@@ -40,7 +40,7 @@ function MainAppBar() {
   };
 
   return (
-    <AppBar position="sticky"s>
+    <AppBar position="sticky">
       <Container maxWidth="xl">
         <Toolbar disableGutters>
           <IconButton

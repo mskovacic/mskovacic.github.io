@@ -12,6 +12,7 @@ import "./app.css";
 import MainAppBar from "./components/mainAppBar";
 import { useEffect, useRef } from "react";
 import { faro } from '@grafana/faro-react';
+import { ToastContainer, Bounce } from 'react-toastify';
 
 export function Layout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -39,6 +40,19 @@ export function Layout({ children }: Readonly<{ children: React.ReactNode }>) {
       </head>
       <body>
         <MainAppBar />
+        <ToastContainer
+                position="top-right"
+                autoClose={5000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="light"
+                transition={Bounce}
+            />
         {children}
         <ScrollRestoration />
         <Scripts />
