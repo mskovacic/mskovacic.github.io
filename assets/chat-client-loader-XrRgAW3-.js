@@ -1,0 +1,1 @@
+function e({params:e}){return console.log(`clientLoader called with params:`,e),e}export{e as clientLoader};
