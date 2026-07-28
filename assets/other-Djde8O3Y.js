@@ -1,0 +1,1 @@
+import{A as e,t}from"./jsx-runtime-D3uM035Y.js";var n=t(),r=e(function({loaderData:e}){return(0,n.jsxs)(`div`,{children:[(0,n.jsx)(`h1`,{children:`Other Page`}),(0,n.jsx)(`p`,{children:`Content is coming soon.`})]})});export{r as default};
