@@ -1,12 +1,12 @@
 import Markdown from 'react-markdown';
-import useAutoScroll from '~/hooks/useAutoScroll';
+import useAutoScroll from '~/features/chat/hooks/useAutoScroll';
 import Spinner from '~/components/spinner';
 import userIcon from '~/assets/images/user.svg';
 import errorIcon from '~/assets/images/error.svg';
 import deleteIcon from '~/assets/images/delete_24.svg';
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
-import type ChatMessage from '~/dtos/chatMessage';
+import type ChatMessage from '~/features/chat/dtos/chatMessage';
 
 function MarkdownContainer(loading: boolean | undefined, content: string, role: string) {
   if (loading && !content) {

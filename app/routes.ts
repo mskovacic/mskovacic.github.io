@@ -4,5 +4,6 @@ export default [
     index("routes/chat.tsx"),
     route("welcome", "routes/home.tsx"),
     route("other", "routes/other.tsx"), 
+    route("battleship", "routes/battleship.tsx"),
 
 ] satisfies RouteConfig;

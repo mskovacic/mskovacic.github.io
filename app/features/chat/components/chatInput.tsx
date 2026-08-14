@@ -1,4 +1,4 @@
-import useAutosize from '~/hooks/useAutosize';
+import useAutosize from '~/features/chat/hooks/useAutosize';
 import { useState } from 'react';
 import sendIcon from '~/assets/images/send.svg';
 

@@ -2,9 +2,9 @@ import { useEffect } from 'react';
 import { useImmer } from 'use-immer';
 import api from '~/helpers/api';
 import { parseSSEStream } from '~/helpers/utils';
-import ChatMessages from '~/components/chat/chatMessages';
-import ChatInput from '~/components/chat/chatInput';
-import type ChatMessage from '~/dtos/chatMessage';
+import ChatMessages from '~/features/chat/components/chatMessages';
+import ChatInput from '~/features/chat/components/chatInput';
+import type ChatMessage from '~/features/chat/dtos/chatMessage';
 
 function getMessages(): ChatMessage[] {
   if (typeof window === 'undefined') return [];

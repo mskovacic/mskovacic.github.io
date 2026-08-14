@@ -1,8 +1,7 @@
-import Chatbot from '~/components/chat/chatbot';
+import Chatbot from '~/features/chat/components/chatbot';
 import { type Route } from './+types/chat';
 import 'react-toastify/dist/ReactToastify.css';
 import { toast } from 'react-toastify';
-import { useEffect } from 'react';
 
 export function clientLoader({ params }: Route.ClientLoaderArgs) {
     console.log("clientLoader called with params:", params);

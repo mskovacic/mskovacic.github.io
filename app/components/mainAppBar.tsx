@@ -13,10 +13,11 @@ import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
 import { NavLink, Link } from "react-router";
 
-const pages: { page: string, path: string }[] = [
-  { page: 'Home', path: '/' },
-  { page: 'Welcome', path: '/welcome' },
-  { page: 'Other', path: '/other' }
+const pages: { page: string, path: string, enabled: boolean }[] = [
+  { page: 'Home', path: '/', enabled: true },
+  { page: 'Welcome', path: '/welcome', enabled: true },
+  { page: 'Other', path: '/other', enabled: true },
+  { page: 'Battleship', path: '/battleship', enabled: import.meta.env.DEV },
 ];
 const settings = ['Profile', 'Account', 'Dashboard', 'Logout'];
 
@@ -97,7 +98,7 @@ function MainAppBar() {
               onClose={handleCloseNavMenu}
               sx={{ display: { xs: 'block', md: 'none' } }}
             >
-              {pages.map((page) => (
+              {pages.filter((s) => s.enabled).map((page) => (
                 <Link key={page.page} to={page.path}>
                   <MenuItem key={page.page} onClick={handleCloseNavMenu}>
                     <Typography sx={{ textAlign: 'center' }}>{page.page}</Typography>

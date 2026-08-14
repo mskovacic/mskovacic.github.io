@@ -1,5 +1,5 @@
 import { toast } from 'react-toastify';
-import type ChatMessage from '~/dtos/chatMessage';
+import type ChatMessage from '~/features/chat/dtos/chatMessage';
 
 const BASE_URL = 'https://msk-portfolio-apim.azure-api.net/basic/openai';
 
