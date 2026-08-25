@@ -18,6 +18,7 @@ const pages: { page: string, path: string, enabled: boolean }[] = [
   { page: 'Welcome', path: '/welcome', enabled: true },
   { page: 'Other', path: '/other', enabled: true },
   { page: 'Battleship', path: '/battleship', enabled: import.meta.env.DEV },
+  { page: 'City Lobby', path: '/lobby', enabled: true },
 ];
 const settings = ['Profile', 'Account', 'Dashboard', 'Logout'];
 

@@ -98,6 +98,23 @@ export async function createGameRoom(playerId?: string): Promise<string> {
     .single();
 
   if (error) throw error;
+
+  // Create the snapshot with the room, rather than when a guest joins. The
+  // host can position ships while waiting, so delaying this would make those
+  // placements impossible to persist and a joining guest could overwrite them
+  // with an empty snapshot.
+  const { error: stateError } = await supabase
+    .from("battleship_game_states")
+    .insert({
+      room_id: data.id,
+      game_state: 0,
+      player1_ships: [],
+      player2_ships: [],
+      player1_shots: [],
+      player2_shots: [],
+    });
+
+  if (stateError) throw stateError;
   return data.id;
 }
 
@@ -137,24 +154,6 @@ export async function joinGameRoom(roomId: string, playerId?: string): Promise<b
   if (updateError) throw updateError;
   if (!claimedRoom?.length) {
     throw new Error("Game room was just claimed by another guest");
-  }
-
-  // Initialize game state for this room
-  const { error: stateError } = await supabase
-    .from("battleship_game_states")
-    .insert({
-      room_id: roomId,
-      game_state: 1,
-      player1_ships: [],
-      player2_ships: [],
-      player1_shots: [],
-      player2_shots: [],
-    })
-    .single();
-
-  if (stateError && stateError.code !== "23505") {
-    // Ignore if state already exists
-    throw stateError;
   }
 
   return true;

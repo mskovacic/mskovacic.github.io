@@ -27,6 +27,7 @@
     "@react-router/node": "version-7",
     "@react-router/serve": "version-7",
     "@supabase/supabase-js": "^2.112.1",
+    "@types/three": "^0.185.4",
     "eventsource-parser": "^3.0.2",
     "immer": "^10.1.1",
     "isbot": "^5.1.44",
@@ -40,6 +41,7 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "remix-utils": "^9.3.1",
+    "three": "^0.185.1",
     "use-immer": "^0.11.0"
   },
   "devDependencies": {

@@ -5,5 +5,6 @@ export default [
     route("welcome", "routes/home.tsx"),
     route("other", "routes/other.tsx"), 
     route("battleship", "routes/battleship.tsx"),
+    route("lobby", "routes/lobby.tsx"),
 
 ] satisfies RouteConfig;
