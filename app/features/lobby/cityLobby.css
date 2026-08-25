@@ -47,6 +47,15 @@
 .interaction-actions button, .username-modal button { display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(200, 235, 223, .22); border-radius: 2px; padding: 12px 13px; background: rgba(121, 177, 174, .12); color: #ecf9f4; font: 600 12px 'Open Sans', sans-serif; cursor: pointer; transition: background .2s, border-color .2s; }
 .interaction-actions button:hover, .username-modal button:hover { border-color: #ffd17e; background: rgba(255, 209, 126, .16); }
 .interaction-actions span { color: #ffd17e; font-size: 18px; font-weight: 400; }
+.game-actions { position: relative; }
+.game-picker { position: absolute; z-index: 3; right: 0; bottom: calc(100% + 8px); left: 0; padding: 10px; border: 1px solid rgba(211, 237, 228, .2); border-radius: 3px; background: rgba(12, 31, 40, .96); box-shadow: 0 15px 35px rgba(2, 14, 20, .4); }
+.game-picker-label { margin: 1px 3px 8px; color: #8eafaa; font-size: 8px; font-weight: 700; letter-spacing: .17em; }
+.game-option { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 1px solid rgba(255, 209, 126, .32); border-radius: 2px; padding: 11px 10px; background: rgba(255, 209, 126, .1); color: #edf8f4; text-align: left; cursor: pointer; }
+.game-option:hover { border-color: #ffd17e; background: rgba(255, 209, 126, .18); }
+.game-option strong, .game-option small { display: block; }
+.game-option strong { font: 600 12px 'Urbanist', sans-serif; }
+.game-option small { margin-top: 3px; color: #9ebbb6; font-size: 9px; }
+.game-option b { color: #ffd17e; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .message-actions button { font-size: 11px; }
 .interaction-empty { text-align: center; color: #a7c4c4; font-size: 12px; line-height: 1.6; }
 .interaction-empty strong { display: block; margin-top: 10px; color: #edf8f4; font: 600 18px 'Urbanist', sans-serif; }
@@ -100,6 +109,19 @@
 .enter-city-button:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .45; }
 .enter-city-button span { font-size: 19px; font-weight: 400; }
 .creator-footnote { margin: 12px 0 0; color: #8facaa; font-size: 10px; text-align: center; }
+.game-invite-backdrop { position: absolute; z-index: 6; inset: 0; display: grid; place-items: center; background: rgba(5, 19, 27, .46); backdrop-filter: blur(5px); }
+.game-invite-modal { width: min(380px, calc(100% - 40px)); padding: 31px 31px 27px; border: 1px solid rgba(255, 209, 126, .42); border-radius: 4px; background: rgba(18, 47, 58, .96); box-shadow: 0 25px 70px rgba(2, 13, 20, .58); }
+.invite-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 19px; border: 1px solid #ffd17e; border-radius: 50%; color: #ffd17e; font-size: 19px; }
+.game-invite-modal h2 { margin: 0; color: #f0fbf6; font: 600 27px/1.05 'Urbanist', sans-serif; letter-spacing: -.05em; }
+.game-invite-modal > p:not(.eyebrow) { margin: 14px 0 25px; color: #b8d2cd; font-size: 12px; line-height: 1.6; }
+.game-invite-modal > p strong { color: #ffd17e; }
+.invite-actions { display: flex; gap: 8px; }
+.invite-actions button { flex: 1; border: 1px solid rgba(209, 237, 226, .25); border-radius: 2px; padding: 12px; font: 600 11px 'Open Sans', sans-serif; cursor: pointer; }
+.invite-decline { background: transparent; color: #c4dbd6; }
+.invite-decline:hover { border-color: #ef8f87; color: #ffd1cb; }
+.invite-accept { border-color: #ffd17e !important; background: #edbd72; color: #17333e; }
+.invite-accept:hover { filter: brightness(1.08); }
+.invite-actions button:disabled { cursor: wait; opacity: .55; }
 @media (max-width: 720px) {
   .city-lobby { min-height: calc(100vh - 56px); }
   .lobby-header { padding: 17px 18px; gap: 10px; }
@@ -129,4 +151,6 @@
   .creator-progress { margin-top: 22px; }
   .creator-panel { width: 100%; max-height: none; padding: 22px 20px 18px; }
   .creator-panel-header h2 { font-size: 19px; }
+  .game-picker { bottom: auto; top: calc(100% + 8px); }
+  .game-invite-modal { padding: 25px 22px 22px; }
 }

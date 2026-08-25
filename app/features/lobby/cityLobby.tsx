@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { createClient } from "~/lib/supabase/client";
-import { getPersistentPlayerId } from "~/lib/supabase/supabaseGame";
+import { createGameRoom, getPersistentPlayerId, joinGameRoom } from "~/lib/supabase/supabaseGame";
 
 type Point = { x: number; z: number };
 type Resident = {
@@ -39,6 +39,15 @@ type LobbyMessage = {
   playerName: string;
   message: string;
   isMine: boolean;
+};
+
+type GameInvitation = {
+  id: string;
+  gameId: "battleship";
+  roomId: string;
+  from: string;
+  fromName: string;
+  to: string;
 };
 
 type CityLobbyProps = {
@@ -282,6 +291,9 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
   const [sceneReady, setSceneReady] = useState(false);
   const [remotePlayers, setRemotePlayers] = useState<Record<string, LobbyPlayerState>>({});
   const [chatMessages, setChatMessages] = useState<LobbyMessage[]>([]);
+  const [gameMenuOpen, setGameMenuOpen] = useState(false);
+  const [gameInvite, setGameInvite] = useState<GameInvitation | null>(null);
+  const [gameInviteBusy, setGameInviteBusy] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "online" | "offline">("connecting");
   const [selected, setSelected] = useState<Resident | null>(null);
   const [interactionMode, setInteractionMode] = useState<"profile" | "messages">("profile");
@@ -407,6 +419,21 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
             message: payload.message,
             isMine: false,
           }].slice(-100));
+        }
+      })
+      .on("broadcast", { event: "game_invitation" }, ({ payload }) => {
+        if (payload?.to === playerId && payload.roomId && payload.gameId === "battleship") {
+          setGameInvite(payload as GameInvitation);
+        }
+      })
+      .on("broadcast", { event: "game_invitation_response" }, ({ payload }) => {
+        if (payload?.to !== playerId || !payload.roomId) return;
+        if (payload.accepted) {
+          setNotice(`${payload.fromName ?? "Your opponent"} accepted. Opening Battleship...`);
+          window.localStorage.setItem("battleship_username", username);
+          window.location.assign(`/battleship?room=${encodeURIComponent(payload.roomId)}`);
+        } else {
+          setNotice(`${payload.fromName ?? "Your opponent"} declined the game invitation.`);
         }
       })
       .subscribe(async (status) => {
@@ -712,6 +739,69 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     setInteractionMode("profile");
   };
 
+  const sendGameInvitation = async (gameId: "battleship") => {
+    if (!selected || !remotePlayers[selected.id] || !realtimeChannelRef.current || !localPlayerIdRef.current) {
+      setNotice("Choose an online player to send a game invitation.");
+      setGameMenuOpen(false);
+      return;
+    }
+
+    try {
+      const roomId = await createGameRoom(localPlayerIdRef.current);
+      const invitation: GameInvitation = {
+        id: `${localPlayerIdRef.current}-${Date.now()}`,
+        gameId,
+        roomId,
+        from: localPlayerIdRef.current,
+        fromName: username,
+        to: selected.id,
+      };
+      await realtimeChannelRef.current.send({ type: "broadcast", event: "game_invitation", payload: invitation });
+      setGameMenuOpen(false);
+      setNotice(`Battleship invitation sent to ${selected.name}.`);
+    } catch (error) {
+      console.error("Failed to create game invitation:", error);
+      setNotice("Could not start the invitation. Please try again.");
+      setGameMenuOpen(false);
+    }
+  };
+
+  const enterBattleship = (roomId: string) => {
+    window.localStorage.setItem("battleship_username", username);
+    window.location.assign(`/battleship?room=${encodeURIComponent(roomId)}`);
+  };
+
+  const respondToGameInvitation = async (accepted: boolean) => {
+    if (!gameInvite || !realtimeChannelRef.current || !localPlayerIdRef.current) return;
+    setGameInviteBusy(true);
+    try {
+      if (accepted) {
+        await joinGameRoom(gameInvite.roomId, localPlayerIdRef.current);
+      }
+      await realtimeChannelRef.current.send({
+        type: "broadcast",
+        event: "game_invitation_response",
+        payload: {
+          invitationId: gameInvite.id,
+          roomId: gameInvite.roomId,
+          from: localPlayerIdRef.current,
+          fromName: username,
+          to: gameInvite.from,
+          accepted,
+        },
+      });
+      const roomId = gameInvite.roomId;
+      setGameInvite(null);
+      if (accepted) enterBattleship(roomId);
+    } catch (error) {
+      console.error("Failed to respond to game invitation:", error);
+      setNotice("The invitation is no longer available.");
+      setGameInvite(null);
+    } finally {
+      setGameInviteBusy(false);
+    }
+  };
+
   return (
     <main className="city-lobby">
       <div className={`creator-wallpaper ${showCreator ? "creator-wallpaper-visible" : ""}`} />
@@ -737,7 +827,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
           <div className="resident-avatar" style={{ backgroundColor: `#${selected.color.toString(16).padStart(6, "0")}` }}>{selected.name.slice(0, 1)}</div>
           {interactionMode === "profile" ? <>
             <p className="eyebrow">PLAYER PROFILE</p><h2>{selected.name}</h2><p className="resident-role">{selected.role}</p><p className="resident-mood">“{selected.mood}”</p>
-            <div className="interaction-actions"><button onClick={() => interact("Game invite")}>Start a game <span>↗</span></button><button onClick={() => setInteractionMode("messages")}>Send a message <span>⌁</span></button><button onClick={() => interact("Party invite")}>Invite to party <span>+</span></button></div>
+            <div className="interaction-actions game-actions"><button onClick={() => setGameMenuOpen((open) => !open)}>Start a game <span>↗</span></button>{gameMenuOpen && <div className="game-picker"><p className="game-picker-label">AVAILABLE GAMES</p><button className="game-option" onClick={() => void sendGameInvitation("battleship")}><span><strong>Battleship</strong><small>Naval strategy · 2 players</small></span><b>Invite →</b></button></div>}<button onClick={() => setInteractionMode("messages")}>Send a message <span>⌁</span></button><button onClick={() => interact("Party invite")}>Invite to party <span>+</span></button></div>
           </> : <>
             <p className="eyebrow">CHOOSE A MESSAGE</p><h2>Say hello</h2><p className="resident-mood">Pick a quick message to send to {selected.name}.</p>
             <div className="interaction-actions message-actions">{messages.map((message) => <button key={message} onClick={() => sendLobbyMessage(message)}>{message} <span>→</span></button>)}<button onClick={() => setInteractionMode("profile")}>Back to profile <span>←</span></button></div>
@@ -768,6 +858,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
           <p className="creator-footnote">Your choices are saved on this device.</p>
         </div>
       </div>}
+      {gameReady && gameInvite && <div className="game-invite-backdrop"><section className="game-invite-modal" role="dialog" aria-modal="true" aria-labelledby="game-invite-title"><div className="invite-icon">⚔</div><p className="eyebrow">INCOMING GAME INVITATION</p><h2 id="game-invite-title">{gameInvite.fromName} wants to play.</h2><p><strong>Battleship</strong> · A two-player room is ready for you both.</p><div className="invite-actions"><button className="invite-decline" onClick={() => void respondToGameInvitation(false)} disabled={gameInviteBusy}>Decline</button><button className="invite-accept" onClick={() => void respondToGameInvitation(true)} disabled={gameInviteBusy}>{gameInviteBusy ? "Joining..." : "Accept & join →"}</button></div></section></div>}
     </main>
   );
 }

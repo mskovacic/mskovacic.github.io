@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useState, useCallback } from "react";
+import { useReducer, useEffect, useState, useCallback, useRef } from "react";
 import {
   checkIfSameCoordinate,
   makeNewMessages,
@@ -86,6 +86,7 @@ const getStoredPlayerId = () => {
 };
 
 const useGame = () => {
+  const autoJoinAttemptedRef = useRef(false);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [playerNumber, setPlayerNumber] = useState<1 | 2 | null>(null);
   const [username, setUsernameState] = useState<string>(getStoredUsername());
@@ -421,6 +422,17 @@ const useGame = () => {
       setIsLoading(false);
     }
   }, [dispatch, playerId]);
+
+  // Invited players arrive with the room in the URL. Automatically hydrate the
+  // Battleship session so neither player has to paste a room code manually.
+  useEffect(() => {
+    if (typeof window === "undefined" || !username || autoJoinAttemptedRef.current) return;
+    const invitedRoomId = new URLSearchParams(window.location.search).get("room");
+    if (!invitedRoomId) return;
+
+    autoJoinAttemptedRef.current = true;
+    void joinExistingGame(invitedRoomId);
+  }, [joinExistingGame, username]);
 
   useEffect(() => {
     if (phase !== "lobby") return;

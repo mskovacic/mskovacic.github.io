@@ -17,7 +17,7 @@ const pages: { page: string, path: string, enabled: boolean }[] = [
   { page: 'Home', path: '/', enabled: true },
   { page: 'Welcome', path: '/welcome', enabled: true },
   { page: 'Other', path: '/other', enabled: true },
-  { page: 'Battleship', path: '/battleship', enabled: import.meta.env.DEV },
+  { page: 'Battleship', path: '/battleship', enabled: false },
   { page: 'City Lobby', path: '/lobby', enabled: true },
 ];
 const settings = ['Profile', 'Account', 'Dashboard', 'Logout'];
@@ -128,7 +128,7 @@ function MainAppBar() {
             MSK PORTFOLIO
           </Typography>
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }}>
-            {pages.map((page) => (
+            {pages.filter((page) => page.enabled).map((page) => (
               <Link key={page.page} to={page.path}>
                 <Button
                   key={page.page}
