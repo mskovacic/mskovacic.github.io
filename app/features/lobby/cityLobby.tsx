@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { createClient } from "~/lib/supabase/client";
+import { getPersistentPlayerId } from "~/lib/supabase/supabaseGame";
 
 type Point = { x: number; z: number };
 type Resident = {
@@ -17,6 +19,26 @@ type CharacterProfile = {
   hairStyle: "crop" | "waves" | "bob" | "ponytail";
   outfitColor: number;
   gender: "feminine" | "masculine" | "androgynous";
+};
+
+type LobbyPlayerState = {
+  id: string;
+  username: string;
+  appearance: CharacterProfile;
+  position: Point;
+  yaw: number;
+  moving: boolean;
+  running: boolean;
+  jumping: boolean;
+  activity: string;
+};
+
+type LobbyMessage = {
+  id: string;
+  timestamp: string;
+  playerName: string;
+  message: string;
+  isMine: boolean;
 };
 
 type CityLobbyProps = {
@@ -243,22 +265,36 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
   const mountRef = useRef<HTMLDivElement>(null);
   const keysRef = useRef<Record<string, boolean>>({});
   const joystickRef = useRef({ x: 0, y: 0, active: false });
+  const chatFeedRef = useRef<HTMLDivElement>(null);
   const jumpRef = useRef({ velocity: 0, grounded: true });
   const cameraYawRef = useRef(0);
   const playerRef = useRef<THREE.Group | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const npcRefs = useRef<Record<string, THREE.Group>>({});
+  const realtimeChannelRef = useRef<any>(null);
+  const localPlayerIdRef = useRef<string>("");
+  const lastBroadcastRef = useRef(0);
   const [username, setUsername] = useState(initialUsername);
   const [nameDraft, setNameDraft] = useState(initialUsername);
   const [profile, setProfile] = useState<CharacterProfile>(defaultProfile);
   const [showCreator, setShowCreator] = useState(true);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [sceneReady, setSceneReady] = useState(false);
+  const [remotePlayers, setRemotePlayers] = useState<Record<string, LobbyPlayerState>>({});
+  const [chatMessages, setChatMessages] = useState<LobbyMessage[]>([]);
+  const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "online" | "offline">("connecting");
   const [selected, setSelected] = useState<Resident | null>(null);
   const [interactionMode, setInteractionMode] = useState<"profile" | "messages">("profile");
   const [notice, setNotice] = useState("You are in the city. Find someone to play with.");
   const [isMoving, setIsMoving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
+  const gameReady = profileLoaded && !showCreator;
+
+  useEffect(() => {
+    const feed = chatFeedRef.current;
+    if (feed) feed.scrollTop = feed.scrollHeight;
+  }, [chatMessages.length]);
 
   useEffect(() => {
     try {
@@ -304,12 +340,110 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     playerRef.current = next;
   }, [profile]);
 
+  // Presence keeps the shared roster durable for late joiners; Broadcast
+  // carries movement because positions change much more often than presence.
   useEffect(() => {
+    if (!gameReady) return;
+
+    let client: ReturnType<typeof createClient>;
+    try {
+      client = createClient();
+    } catch (error) {
+      console.warn("Supabase lobby presence is unavailable:", error);
+      setRealtimeStatus("offline");
+      return;
+    }
+
+    const playerId = getPersistentPlayerId();
+    localPlayerIdRef.current = playerId;
+    const channel = client.channel("city-lobby:central-plaza", {
+      config: { presence: { key: playerId } },
+    });
+    realtimeChannelRef.current = channel;
+
+    const applyPresence = () => {
+      const next: Record<string, LobbyPlayerState> = {};
+      const state = channel.presenceState() as Record<string, LobbyPlayerState[]>;
+      Object.values(state).flat().forEach((player) => {
+        if (!player?.id || player.id === playerId) return;
+        next[player.id] = {
+          ...player,
+          appearance: { ...defaultProfile, ...(player.appearance ?? {}) },
+          position: player.position ?? { x: 0, z: 0 },
+        };
+      });
+      setRemotePlayers(next);
+    };
+
+    channel
+      .on("presence", { event: "sync" }, applyPresence)
+      .on("presence", { event: "leave" }, ({ key }) => {
+        setRemotePlayers((current) => {
+          if (!current[key]) return current;
+          const next = { ...current };
+          delete next[key];
+          return next;
+        });
+      })
+      .on("broadcast", { event: "player_state" }, ({ payload }) => {
+        if (!payload?.id || payload.id === playerId) return;
+        setRemotePlayers((current) => ({
+          ...current,
+          [payload.id]: {
+            ...current[payload.id],
+            ...payload,
+            appearance: { ...defaultProfile, ...(payload.appearance ?? current[payload.id]?.appearance ?? {}) },
+            position: payload.position ?? current[payload.id]?.position ?? { x: 0, z: 0 },
+          },
+        }));
+      })
+      .on("broadcast", { event: "lobby_message" }, ({ payload }) => {
+        if (payload?.to === playerId && payload.message) {
+          setNotice(`${payload.fromName ?? "A player"}: “${payload.message}”`);
+          setChatMessages((current) => [...current, {
+            id: `${payload.from ?? "player"}-${Date.now()}`,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            playerName: payload.fromName ?? "A player",
+            message: payload.message,
+            isMine: false,
+          }].slice(-100));
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          setRealtimeStatus("offline");
+          return;
+        }
+        if (status !== "SUBSCRIBED") return;
+        setRealtimeStatus("online");
+        await channel.track({
+          id: playerId,
+          username,
+          appearance: profile,
+          position: { x: playerRef.current?.position.x ?? 0, z: playerRef.current?.position.z ?? 7 },
+          yaw: playerRef.current?.rotation.y ?? Math.PI,
+          moving: false,
+          running: false,
+          jumping: false,
+          activity: "Idle",
+        });
+      });
+
+    return () => {
+      realtimeChannelRef.current = null;
+      setRemotePlayers({});
+      void channel.untrack();
+      void channel.unsubscribe();
+    };
+  }, [gameReady, profile, username]);
+
+  useEffect(() => {
+    if (!gameReady) return;
     const onKeyDown = (event: KeyboardEvent) => {
       keysRef.current[event.key.toLowerCase()] = true;
       if (event.code === "Space" && (event.target as HTMLElement | null)?.tagName !== "INPUT") {
         if (jumpRef.current.grounded) {
-          jumpRef.current.velocity = 0.19;
+          jumpRef.current.velocity = 0.15;
           jumpRef.current.grounded = false;
         }
         event.preventDefault();
@@ -320,10 +454,10 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp); };
-  }, []);
+  }, [gameReady]);
 
   useEffect(() => {
-    if (!mountRef.current) return;
+    if (!mountRef.current || !gameReady) return;
     const mount = mountRef.current;
     const scene = new THREE.Scene();
     sceneRef.current = scene;
@@ -346,6 +480,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       const npc = createAvatar(resident.color);
       npc.position.set(resident.position.x, 0, resident.position.z);
       npc.userData.residentId = resident.id;
+      npc.userData.ambient = true;
       scene.add(npc);
       const label = createNameLabel(resident.name);
       if (label) npc.add(label);
@@ -365,11 +500,23 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       const npc = hit?.parent?.userData.residentId ? hit.parent : hit?.parent?.parent;
       const residentId = npc?.userData.residentId;
       if (residentId) {
-        setSelected(residents.find((resident) => resident.id === residentId) ?? null);
+        const remote = npc.userData.remotePlayer as LobbyPlayerState | undefined;
+        const target = remote
+          ? {
+              id: remote.id,
+              name: remote.username,
+              role: "City player",
+              mood: remote.activity,
+              color: remote.appearance.outfitColor,
+              position: remote.position,
+            }
+          : residents.find((resident) => resident.id === residentId) ?? null;
+        setSelected(target);
         setInteractionMode("profile");
       }
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
+    setSceneReady(true);
 
     const timer = new THREE.Timer();
     timer.connect(document);
@@ -400,7 +547,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
         }
         if (!jumpRef.current.grounded || player.position.y > 0) {
           player.position.y += jumpRef.current.velocity;
-          jumpRef.current.velocity -= 0.008;
+          jumpRef.current.velocity -= 0.007;
           if (player.position.y <= 0) {
             player.position.y = 0;
             jumpRef.current.velocity = 0;
@@ -419,10 +566,40 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
         camera.lookAt(player.position.x, 1.1, player.position.z);
       }
       Object.values(npcRefs.current).forEach((npc, index) => {
+        const remote = npc.userData.remotePlayer as LobbyPlayerState | undefined;
+        if (remote) {
+          const target = remote.position;
+          npc.position.x = THREE.MathUtils.lerp(npc.position.x, target.x, 0.18);
+          npc.position.z = THREE.MathUtils.lerp(npc.position.z, target.z, 0.18);
+          npc.position.y = THREE.MathUtils.lerp(npc.position.y, remote.jumping ? 0.32 : 0, 0.18);
+          npc.rotation.y = THREE.MathUtils.lerp(npc.rotation.y, remote.yaw, 0.18);
+          const limbs = npc.userData.limbs as THREE.Object3D[];
+          const swing = remote.moving ? Math.sin(elapsed * (remote.running ? 16 : 11)) * (remote.running ? 0.62 : 0.42) : Math.sin(elapsed * 2) * 0.025;
+          if (limbs.length === 4) { limbs[0].rotation.x = swing; limbs[1].rotation.x = -swing; limbs[2].rotation.x = -swing * 0.65; limbs[3].rotation.x = swing * 0.65; }
+          return;
+        }
         const idle = Math.sin(elapsed * 1.6 + index) * 0.025;
         npc.position.y = idle;
         npc.rotation.y = Math.sin(elapsed * 0.32 + index) * 0.18;
       });
+      if (realtimeChannelRef.current && playerRef.current && elapsed - lastBroadcastRef.current > 0.12) {
+        lastBroadcastRef.current = elapsed;
+        void realtimeChannelRef.current.send({
+          type: "broadcast",
+          event: "player_state",
+          payload: {
+            id: localPlayerIdRef.current,
+            username,
+            appearance: profile,
+            position: { x: playerRef.current.position.x, z: playerRef.current.position.z },
+            yaw: playerRef.current.rotation.y,
+            moving,
+            running,
+            jumping: !jumpRef.current.grounded,
+            activity: running ? "Running through the district" : moving ? "Exploring the district" : "Idle",
+          },
+        });
+      }
       renderer.render(scene, camera);
     };
     animate();
@@ -443,9 +620,54 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       mount.removeChild(renderer.domElement);
       playerRef.current = null;
       sceneRef.current = null;
+      setSceneReady(false);
       npcRefs.current = {};
     };
-  }, []);
+  }, [gameReady]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !gameReady || !sceneReady) return;
+    const remoteIds = new Set(Object.keys(remotePlayers));
+
+    Object.entries(remotePlayers).forEach(([id, player]) => {
+      const appearanceKey = JSON.stringify(player.appearance);
+      const existing = npcRefs.current[id];
+      if (existing && existing.userData.remoteAppearanceKey !== appearanceKey) {
+        scene.remove(existing);
+        delete npcRefs.current[id];
+      }
+      const avatar = npcRefs.current[id] ?? createAvatar(player.appearance.outfitColor, false, player.appearance);
+      avatar.userData.remotePlayer = player;
+      avatar.userData.remoteAppearanceKey = appearanceKey;
+      avatar.userData.residentId = id;
+      if (!npcRefs.current[id]) {
+        avatar.position.set(player.position.x, 0, player.position.z);
+        const label = createNameLabel(player.username);
+        if (label) avatar.add(label);
+        scene.add(avatar);
+        npcRefs.current[id] = avatar;
+      }
+    });
+
+    Object.entries(npcRefs.current).forEach(([id, avatar]) => {
+      if (avatar.userData.remotePlayer && !remoteIds.has(id)) {
+        scene.remove(avatar);
+        delete npcRefs.current[id];
+      }
+    });
+  }, [gameReady, remotePlayers, sceneReady]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !gameReady || !sceneReady || realtimeStatus !== "online") return;
+    Object.entries(npcRefs.current).forEach(([id, avatar]) => {
+      if (avatar.userData.ambient) {
+        scene.remove(avatar);
+        delete npcRefs.current[id];
+      }
+    });
+  }, [gameReady, realtimeStatus, sceneReady]);
 
   const updateJoystick = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -465,6 +687,31 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     setNotice(`${action} sent to ${selected.name}.`);
   };
 
+  const sendLobbyMessage = (message: string) => {
+    if (!selected) return;
+    setNotice(`Message sent to ${selected.name}: “${message}”`);
+    setChatMessages((current) => [...current, {
+      id: `${localPlayerIdRef.current || "me"}-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      playerName: username || "You",
+      message,
+      isMine: true,
+    }].slice(-100));
+    if (realtimeChannelRef.current && localPlayerIdRef.current) {
+      void realtimeChannelRef.current.send({
+        type: "broadcast",
+        event: "lobby_message",
+        payload: {
+          from: localPlayerIdRef.current,
+          fromName: username,
+          to: selected.id,
+          message,
+        },
+      });
+    }
+    setInteractionMode("profile");
+  };
+
   return (
     <main className="city-lobby">
       <div className={`creator-wallpaper ${showCreator ? "creator-wallpaper-visible" : ""}`} />
@@ -472,12 +719,19 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       <div className="city-vignette" />
       <header className="lobby-header">
         <div className="lobby-brand"><span className="brand-mark">✦</span><div><strong>NEON DISTRICT</strong><small>social game lobby</small></div></div>
-        <div className="lobby-status"><span className="live-dot" /> {residents.length + 1} players online</div>
+        <div className="lobby-status"><span className="live-dot" /> {realtimeStatus === "online" ? `${Object.keys(remotePlayers).length + 1} players online` : realtimeStatus === "connecting" ? "Connecting to city..." : "Offline preview"}</div>
         <div className="lobby-user"><span className="mini-avatar">{username.slice(0, 1).toUpperCase() || "?"}</span>{username || "Visitor"}</div>
       </header>
-      <section className="lobby-intro"><p className="eyebrow">DISTRICT 01 · CENTRAL PLAZA</p><h1>Find your <em>people.</em></h1><p className="intro-copy">Walk the city, meet fellow players, and turn a hello into your next match.</p></section>
-      <div className="city-notice"><span className="notice-pulse" />{notice}</div>
-      <aside className={`interaction-card ${selected ? "is-open" : ""}`} aria-live="polite">
+      {gameReady && <>
+        <section className="lobby-intro"><p className="eyebrow">DISTRICT 01 · CENTRAL PLAZA</p><h1>Find your <em>people.</em></h1><p className="intro-copy">Walk the city, meet fellow players, and turn a hello into your next match.</p></section>
+        <div className="city-notice"><span className="notice-pulse" />{notice}</div>
+        <section className="chat-feed" aria-label="Lobby chat">
+          <div className="chat-feed-header"><span className="live-dot" /> DISTRICT CHAT <small>{chatMessages.length ? `${chatMessages.length} messages` : "No messages yet"}</small></div>
+          <div ref={chatFeedRef} className="chat-feed-list">
+            {chatMessages.length === 0 ? <p className="chat-empty">Messages from players will appear here.</p> : chatMessages.map((entry) => <article className={`chat-message ${entry.isMine ? "mine" : ""}`} key={entry.id}><div className="chat-message-meta"><strong>{entry.playerName}</strong><time>{entry.timestamp}</time></div><p>{entry.message}</p></article>)}
+          </div>
+        </section>
+        <aside className={`interaction-card ${selected ? "is-open" : ""}`} aria-live="polite">
         {selected ? <>
           <button className="close-card" onClick={() => { setSelected(null); setInteractionMode("profile"); }} aria-label="Close interaction card">×</button>
           <div className="resident-avatar" style={{ backgroundColor: `#${selected.color.toString(16).padStart(6, "0")}` }}>{selected.name.slice(0, 1)}</div>
@@ -486,13 +740,14 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
             <div className="interaction-actions"><button onClick={() => interact("Game invite")}>Start a game <span>↗</span></button><button onClick={() => setInteractionMode("messages")}>Send a message <span>⌁</span></button><button onClick={() => interact("Party invite")}>Invite to party <span>+</span></button></div>
           </> : <>
             <p className="eyebrow">CHOOSE A MESSAGE</p><h2>Say hello</h2><p className="resident-mood">Pick a quick message to send to {selected.name}.</p>
-            <div className="interaction-actions message-actions">{messages.map((message) => <button key={message} onClick={() => { setNotice(`Message sent to ${selected.name}: “${message}”`); setInteractionMode("profile"); }}>{message} <span>→</span></button>)}<button onClick={() => setInteractionMode("profile")}>Back to profile <span>←</span></button></div>
+            <div className="interaction-actions message-actions">{messages.map((message) => <button key={message} onClick={() => sendLobbyMessage(message)}>{message} <span>→</span></button>)}<button onClick={() => setInteractionMode("profile")}>Back to profile <span>←</span></button></div>
           </>}
         </> : <div className="interaction-empty"><span className="cursor-icon">⌁</span><strong>Meet someone</strong><p>Click a character in the city to see interaction options.</p></div>}
-      </aside>
-      <div className="movement-hint"><kbd>W</kbd><kbd>S</kbd><span>move</span><kbd>A</kbd><kbd>D</kbd><span>turn</span><kbd>⇧</kbd><span>run</span><kbd className="space-key">SPACE</kbd><span>jump</span></div>
-      <div className="mobile-joystick" onPointerMove={updateJoystick} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); updateJoystick(event); }} onPointerUp={endJoystick} onPointerCancel={endJoystick} aria-label="Movement joystick"><div className="joystick-ring"><div className="joystick-thumb" style={{ transform: `translate(${joystickPosition.x}px, ${joystickPosition.y}px)` }} /></div></div>
-      <div className={`movement-state ${isMoving ? "moving" : ""}`}>{isMoving ? (isRunning ? "RUNNING" : "WALKING") : "IDLE"}</div>
+        </aside>
+        <div className="movement-hint"><kbd>W</kbd><kbd>S</kbd><span>move</span><kbd>A</kbd><kbd>D</kbd><span>turn</span><kbd>⇧</kbd><span>run</span><kbd className="space-key">SPACE</kbd><span>jump</span></div>
+        <div className="mobile-joystick" onPointerMove={updateJoystick} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); updateJoystick(event); }} onPointerUp={endJoystick} onPointerCancel={endJoystick} aria-label="Movement joystick"><div className="joystick-ring"><div className="joystick-thumb" style={{ transform: `translate(${joystickPosition.x}px, ${joystickPosition.y}px)` }} /></div></div>
+        <div className={`movement-state ${isMoving ? "moving" : ""}`}>{isMoving ? (isRunning ? "RUNNING" : "WALKING") : "IDLE"}</div>
+      </>}
       {profileLoaded && showCreator && <div className="character-creator">
         <div className="creator-copy">
           <p className="eyebrow">NEON DISTRICT · CHARACTER SETUP</p>

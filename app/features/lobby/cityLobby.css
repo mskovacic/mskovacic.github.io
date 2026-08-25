@@ -6,7 +6,7 @@
 .creator-wallpaper-visible { opacity: 1; }
 .creator-wallpaper-visible + .city-canvas { opacity: .2; }
 .city-vignette { position: absolute; z-index: 1; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 48%, transparent 22%, rgba(8, 27, 35, .2) 66%, rgba(8, 20, 29, .82) 130%); }
-.lobby-header, .lobby-intro, .city-notice, .interaction-card, .movement-hint, .movement-state, .mobile-joystick { position: absolute; z-index: 2; }
+.lobby-header, .lobby-intro, .city-notice, .chat-feed, .interaction-card, .movement-hint, .movement-state, .mobile-joystick { position: absolute; z-index: 2; }
 .lobby-header { top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 24px; padding: 25px clamp(20px, 5vw, 72px); border-bottom: 1px solid rgba(218, 242, 235, .16); background: linear-gradient(180deg, rgba(12, 35, 44, .76), transparent); }
 .lobby-brand { display: flex; align-items: center; gap: 11px; letter-spacing: .11em; }
 .brand-mark { display: grid; place-items: center; width: 31px; height: 31px; border: 1px solid #d5eddf; border-radius: 50%; color: #ffd179; font-size: 16px; }
@@ -23,6 +23,19 @@
 .intro-copy { max-width: 280px; margin-top: 19px; color: #bdd5d1; font-size: 13px; line-height: 1.7; }
 .city-notice { bottom: 29px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 11px 17px; border: 1px solid rgba(195, 229, 217, .16); border-radius: 100px; background: rgba(16, 43, 52, .7); color: #c1dad4; font-size: 11px; backdrop-filter: blur(9px); white-space: nowrap; }
 .notice-pulse { width: 6px; height: 6px; background: #ffd17e; box-shadow: none; }
+.chat-feed { left: clamp(20px, 5vw, 72px); bottom: 27px; width: min(335px, calc(100vw - 40px)); overflow: hidden; border: 1px solid rgba(195, 229, 217, .18); border-radius: 4px; background: rgba(12, 35, 44, .76); box-shadow: 0 18px 45px rgba(4, 18, 24, .24); backdrop-filter: blur(13px); }
+.chat-feed-header { display: flex; align-items: center; gap: 8px; padding: 11px 14px 10px; border-bottom: 1px solid rgba(195, 229, 217, .13); color: #d9eee6; font-size: 9px; font-weight: 700; letter-spacing: .16em; }
+.chat-feed-header .live-dot { width: 5px; height: 5px; box-shadow: none; }
+.chat-feed-header small { margin-left: auto; color: #8eafaa; font-size: 9px; font-weight: 400; letter-spacing: .02em; }
+.chat-feed-list { max-height: 194px; overflow-y: auto; padding: 10px 12px 12px; scrollbar-width: thin; scrollbar-color: rgba(211, 237, 228, .3) transparent; }
+.chat-empty { margin: 4px 2px 2px; color: #8eafaa; font: italic 12px/1.5 Georgia, serif; }
+.chat-message { margin: 0 0 10px; padding: 9px 10px; border: 1px solid rgba(195, 229, 217, .1); border-radius: 3px 10px 10px 10px; background: rgba(143, 186, 179, .1); }
+.chat-message:last-child { margin-bottom: 0; }
+.chat-message.mine { border-color: rgba(255, 209, 126, .18); border-radius: 10px 3px 10px 10px; background: rgba(255, 209, 126, .1); }
+.chat-message-meta { display: flex; align-items: baseline; gap: 8px; }
+.chat-message-meta strong { color: #ffd17e; font-size: 10px; letter-spacing: .03em; }
+.chat-message-meta time { color: #86a7a2; font-size: 9px; }
+.chat-message p { margin: 4px 0 0; color: #e1efea; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
 .interaction-card { top: 50%; right: clamp(20px, 5vw, 72px); width: min(290px, calc(100vw - 40px)); transform: translateY(-43%); padding: 28px; border: 1px solid rgba(209, 240, 228, .2); border-radius: 4px; background: rgba(17, 40, 49, .82); box-shadow: 0 25px 60px rgba(4, 18, 24, .33); backdrop-filter: blur(16px); opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease; }
 .interaction-card.is-open { opacity: 1; transform: translateY(-50%); pointer-events: auto; }
 .close-card { position: absolute; top: 11px; right: 14px; border: 0; background: none; color: #a8c5c0; font-size: 24px; cursor: pointer; }
@@ -106,6 +119,8 @@
   .movement-hint { display: none; }
   .movement-state { top: 77px; right: 18px; }
   .city-notice { bottom: 22px; max-width: calc(100% - 150px); overflow: hidden; font-size: 10px; }
+  .chat-feed { right: 16px; bottom: 154px; left: 16px; width: auto; }
+  .chat-feed-list { max-height: 125px; }
   .username-modal { padding: 32px 26px 28px; }
   .character-creator { display: block; overflow: auto; padding: 85px 18px 28px; }
   .creator-copy { width: auto; margin: 0 2px 24px; }
