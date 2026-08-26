@@ -1,7 +1,7 @@
 import React from "react";
-import "./Log.css";
-import LogListItem from "./LogListItem";
-import NewGameButton from "./NewGameButton";
+import "./log.css";
+import LogListItem from "./logListItem";
+import NewGameButton from "./newGameButton";
 import useScrollToBottom from "../../hooks/useScrollToBottom";
 
 const LogList = ({ messages, newGame, isGameOver, hasRequestedRematch }) => {

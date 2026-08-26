@@ -1,18 +1,36 @@
 .log-display {
-  border: 0.5em solid #fca311;
-  border-left: none;
-  width: 100%;
-  height: 20%;
+  box-sizing: border-box;
+  position: fixed !important;
+  left: 1rem;
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  z-index: 20;
+  border: 0.35em solid #fca311;
+  width: min(32rem, calc(100vw - 2rem));
+  height: clamp(9rem, 24vh, 15rem);
+  max-height: calc(100dvh - 1.5rem);
+  min-height: 0;
   background-color: #e5e5e5;
   display: flex;
+  box-shadow: 0 0.75rem 2rem #0008;
 }
 
 .logs {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
   width: 100%;
+  height: 100%;
   padding: 0 1em 0 0.8em;
   background-color: #e5e5e5;
   overflow-y: scroll;
+  overflow-x: hidden;
   border: 0.13em solid #14213d;
+}
+
+.logs p {
+  margin: 0.4rem 0;
+  line-height: 1.35;
 }
 
 .new-game {
@@ -33,4 +51,21 @@
   font-size: 1.2em;
   height: 5em;
   width: 5em;
+}
+
+@media (max-width: 640px) {
+  .log-display {
+    left: 0.5rem;
+    bottom: 0.5rem;
+    width: calc(100vw - 1rem);
+    height: 10rem;
+  }
+
+  .new-game {
+    padding: 0.5rem;
+  }
+
+  .new-game button {
+    font-size: 0.9em;
+  }
 }

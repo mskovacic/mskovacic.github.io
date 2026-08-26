@@ -17,7 +17,6 @@ import {
   NEW_OPPONENT,
   NEW_MESSAGE,
   NEW_GAME,
-  OPPONENT_LEFT,
   initialState,
   INITIAL_MSG_NO_OPPONENT,
   INITIAL_MSG_HAVE_OPPONENT,
@@ -60,6 +59,7 @@ import {
   touchGameRoomPlayer,
   completeGameRoom,
   resolveInactiveGameRoom,
+  leaveGameRoom,
   requestGameRematch,
   type GameRoom,
 } from "../../../lib/supabase/supabaseGame";
@@ -87,6 +87,13 @@ const getStoredPlayerId = () => {
 
 const useGame = () => {
   const autoJoinAttemptedRef = useRef(false);
+  const returnToCityRef = useRef(false);
+  const processedEventIdsRef = useRef<Set<string>>(new Set());
+  const lastShipsSyncKeyRef = useRef<string | null>(null);
+  const terminalStateHandledRef = useRef<number | null>(null);
+  const lastRoomUpdatedAtRef = useRef(0);
+  const latestRoomRef = useRef<GameRoom | null>(null);
+  const pendingLeaveTimerRef = useRef<number | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [playerNumber, setPlayerNumber] = useState<1 | 2 | null>(null);
   const [username, setUsernameState] = useState<string>(getStoredUsername());
@@ -131,7 +138,16 @@ const useGame = () => {
 
   const reducers: any = {
     [NEW_OPPONENT](state: any, { opponent }: any) {
-      const newGameState = opponent ? 1 : 0;
+      // Room updates arrive repeatedly (once from Realtime and again from the
+      // fallback poll). Do not reset the local game every time the same room
+      // snapshot is observed. In particular, the persisted game-state row is
+      // initially `0`; that is a database bootstrap value, not a signal that a
+      // joined room is still waiting.
+      if (state.gotInitialOpponent && state.opponent === opponent) return state;
+
+      const newGameState = opponent
+        ? state.gameState === 0 ? 1 : state.gameState
+        : 0;
       return {
         ...state,
         opponent,
@@ -141,6 +157,10 @@ const useGame = () => {
     },
     [NEW_MESSAGE](state: any, { message }: any) {
       const { messages } = state;
+      // Realtime and polling can cause the same transition effect to run more
+      // than once. Keep the chat readable while still allowing the same text
+      // to be sent again after another message has appeared.
+      if (messages[messages.length - 1]?.message === message) return state;
       const newMessages = makeNewMessages(messages, message);
       return { ...state, haveSendInitialMsg: true, messages: newMessages };
     },
@@ -152,13 +172,6 @@ const useGame = () => {
         messages: newMessages,
         roomId: state.roomId,
         playerNumber: state.playerNumber,
-      };
-    },
-    [OPPONENT_LEFT]({ messages }: any) {
-      return {
-        ...initialState(),
-        messages,
-        haveSendInitialMsg: true,
       };
     },
     [CLEAR_TILES](state: any) {
@@ -232,7 +245,13 @@ const useGame = () => {
     },
     [SET_OPPONENT_SHIPS](state: any, { opponentShips }: any) {
       const { gameState } = state;
-      const newGameState = gameState === 2 ? 3 : gameState;
+      if (!Array.isArray(opponentShips) || opponentShips.length === 0) return state;
+      // Player 1 always opens the attack when both layouts are ready. This
+      // makes simultaneous placement deterministic instead of leaving both
+      // clients in attack mode (or both waiting on the other client).
+      const newGameState = gameState === 2
+        ? state.playerNumber === 1 ? 3 : 4
+        : gameState;
       return { ...state, opponentShips, gameState: newGameState };
     },
     [OPPONENTS_TURN](state: any) {
@@ -271,15 +290,43 @@ const useGame = () => {
     },
     UPDATE_STATE(state: any, { payload }: any) {
       // Update from Supabase
+      const incomingMyShips = state.playerNumber === 1
+        ? payload.player1_ships
+        : payload.player2_ships;
+      const incomingOpponentShips = state.playerNumber === 1
+        ? payload.player2_ships
+        : payload.player1_ships;
+      const myShipsFromPayload = incomingMyShips ?? state.myShips;
+      const opponentShipsFromPayload = Array.isArray(incomingOpponentShips)
+        && incomingOpponentShips.length === 0
+        ? state.opponentShips
+        : incomingOpponentShips ?? state.opponentShips;
+      const hasOpponentShips = Array.isArray(opponentShipsFromPayload)
+        && opponentShipsFromPayload.length > 0;
+      const placementComplete = Array.isArray(myShipsFromPayload)
+        && myShipsFromPayload.length >= ships.length;
+      const persistedGameState = Number(payload.game_state);
+      // `game_state` is retained for completed games, but the active turn and
+      // placement state are local transitions driven by events. Treating the
+      // initial persisted 0 as authoritative was the source of the board
+      // jumping back to the waiting screen after a player joined or placed.
+      let nextGameState = state.gameState;
+      if (persistedGameState >= 5) {
+        nextGameState = persistedGameState;
+      } else if (state.gameState === 0 && state.opponent) {
+        nextGameState = 1;
+      } else if (state.gameState === 1 && placementComplete) {
+        nextGameState = 2;
+      } else if (state.gameState === 2 && hasOpponentShips) {
+        nextGameState = state.playerNumber === 1 ? 3 : 4;
+      }
+
       return {
         ...state,
-        gameState: payload.game_state ?? state.gameState,
-        opponentShips: state.playerNumber === 1
-          ? payload.player2_ships ?? state.opponentShips
-          : payload.player1_ships ?? state.opponentShips,
-        myShips: state.playerNumber === 1
-          ? payload.player1_ships ?? state.myShips
-          : payload.player2_ships ?? state.myShips,
+        gameState: nextGameState,
+        shipTilesState: Math.max(state.shipTilesState, Array.isArray(myShipsFromPayload) ? myShipsFromPayload.length : 0),
+        opponentShips: opponentShipsFromPayload,
+        myShips: myShipsFromPayload,
         opponentShipsShot: state.playerNumber === 1
           ? payload.player2_shots ?? state.opponentShipsShot
           : payload.player1_shots ?? state.opponentShipsShot,
@@ -379,11 +426,6 @@ const useGame = () => {
         setPhase("game");
         window.history.replaceState({}, "", `?room=${trimmedRoomCode}`);
         dispatch({ type: NEW_MESSAGE, message: MSG_HAVE_OPPONENT });
-        
-        const gameState = await getGameState(trimmedRoomCode);
-        if (gameState) {
-          dispatch({ type: "UPDATE_STATE", payload: gameState });
-        }
         return;
       }
 
@@ -409,11 +451,6 @@ const useGame = () => {
       setPhase("game");
       window.history.replaceState({}, "", `?room=${trimmedRoomCode}`);
       dispatch({ type: NEW_MESSAGE, message: MSG_HAVE_OPPONENT });
-
-      const gameState = await getGameState(trimmedRoomCode);
-      if (gameState) {
-        dispatch({ type: "UPDATE_STATE", payload: gameState });
-      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to join game room";
       console.error("Failed to join game room:", err);
@@ -492,6 +529,13 @@ const useGame = () => {
     let isMounted = true;
     const applyRoom = (room: GameRoom) => {
       if (!isMounted) return;
+      const roomUpdatedAt = Date.parse(room.updated_at);
+      if (Number.isFinite(roomUpdatedAt) && roomUpdatedAt < lastRoomUpdatedAtRef.current) return;
+      // A delayed REST response must not roll a realtime `playing` room back
+      // to `waiting` after the second player has already been claimed.
+      if (latestRoomRef.current?.status === "playing" && room.status === "waiting") return;
+      if (Number.isFinite(roomUpdatedAt)) lastRoomUpdatedAtRef.current = roomUpdatedAt;
+      latestRoomRef.current = room;
       setCurrentRoom(room);
       dispatch({ type: NEW_OPPONENT, opponent: Boolean(room.player1_id && room.player2_id) });
 
@@ -550,6 +594,29 @@ const useGame = () => {
     return () => window.clearInterval(intervalId);
   }, [roomId, playerNumber]);
 
+  // Leaving the Battleship route is an explicit presence change. Delay the
+  // write slightly so React StrictMode's development-only effect replay does
+  // not mark a freshly mounted player as gone.
+  useEffect(() => {
+    if (!roomId || playerNumber === null || typeof window === "undefined") return;
+
+    if (pendingLeaveTimerRef.current !== null) {
+      window.clearTimeout(pendingLeaveTimerRef.current);
+      pendingLeaveTimerRef.current = null;
+    }
+
+    return () => {
+      const leavingRoomId = roomId;
+      const leavingPlayerNumber = playerNumber;
+      pendingLeaveTimerRef.current = window.setTimeout(() => {
+        pendingLeaveTimerRef.current = null;
+        void leaveGameRoom(leavingRoomId, leavingPlayerNumber).catch((error) => {
+          console.warn("Failed to mark Battleship player as left:", error);
+        });
+      }, 750);
+    };
+  }, [roomId, playerNumber]);
+
   // Subscribe to game events
   useEffect(() => {
     if (!roomId || playerNumber === null) return;
@@ -557,6 +624,16 @@ const useGame = () => {
     const unsubscribe = subscribeToGameEvents(roomId, (event) => {
       // Only process events from the opponent
       if (event.player_number === playerNumber) return;
+      if (event.id) {
+        const eventId = String(event.id);
+        if (processedEventIdsRef.current.has(eventId)) return;
+        processedEventIdsRef.current.add(eventId);
+        // Keep this bounded for long-lived rooms.
+        if (processedEventIdsRef.current.size > 500) {
+          const first = processedEventIdsRef.current.values().next().value;
+          if (first) processedEventIdsRef.current.delete(first);
+        }
+      }
 
       switch (event.event_type) {
         case "ships_placed":
@@ -592,29 +669,15 @@ const useGame = () => {
         : INITIAL_MSG_NO_OPPONENT;
 
       dispatch({ type: NEW_MESSAGE, message });
-      if (!opponent) dispatch({ type: OPPONENT_LEFT });
     }
   }, [opponent]);
 
   useEffect(() => {
     switch (gameState) {
-      case 1:
-        const { numOfTiles, name } = ships[0];
-        dispatch({
-          type: NEW_MESSAGE,
-          message: makeMsgForSelectingTiles(name, numOfTiles),
-        });
-        break;
       case 2:
-        // Sync ships to Supabase
-        if (playerNumber === 1) {
-          syncStateToSupabase({ player1_ships: myShips, player1_placed_ships: true });
-          recordEvent("ships_placed", myShips, playerNumber);
-        } else if (playerNumber === 2) {
-          syncStateToSupabase({ player2_ships: myShips, player2_placed_ships: true });
-          recordEvent("ships_placed", myShips, playerNumber);
+        if (Array.isArray(opponentShips) && opponentShips.length > 0) {
+          return dispatch({ type: SET_OPPONENT_SHIPS, opponentShips });
         }
-        if (opponentShips) return dispatch({ type: OPPONENTS_TURN });
         dispatch({ type: NEW_MESSAGE, message: MSG_OPPONENT_PLACING_SHIPS });
         break;
       case 3:
@@ -655,34 +718,60 @@ const useGame = () => {
         dispatch({ type: NEW_MESSAGE, message: MSG_DEFEND });
         break;
       case 5:
+        if (terminalStateHandledRef.current === 5) break;
+        terminalStateHandledRef.current = 5;
         dispatch({ type: NEW_MESSAGE, message: MSG_WIN });
         if (roomId && playerNumber !== null) {
           void completeGameRoom(roomId, `player${playerNumber}` as "player1" | "player2");
           void recordEvent("end", null, playerNumber);
         }
+        if (!returnToCityRef.current && typeof window !== "undefined") {
+          returnToCityRef.current = true;
+          window.setTimeout(() => window.location.assign("/lobby"), 1800);
+        }
         break;
       case 6:
+        if (terminalStateHandledRef.current === 6) break;
+        terminalStateHandledRef.current = 6;
         dispatch({ type: NEW_MESSAGE, message: MSG_LOSE });
+        if (!returnToCityRef.current && typeof window !== "undefined") {
+          returnToCityRef.current = true;
+          window.setTimeout(() => window.location.assign("/lobby"), 1800);
+        }
         break;
       default:
     }
-  }, [gameState, myShips, opponentShips, myShipsShot, opponentShipsShot, playerNumber, recordEvent, roomId, syncStateToSupabase]);
+  }, [gameState, playerNumber, recordEvent, roomId, syncStateToSupabase]);
+
+  // Ship placement is persisted once per completed layout. Keeping this out of
+  // the turn-message effect prevents every Realtime snapshot from inserting a
+  // second `ships_placed` event and replaying the chat sequence.
+  useEffect(() => {
+    if (gameState !== 2 || playerNumber === null || myShips.length !== ships.length) return;
+    const syncKey = `${playerNumber}:${JSON.stringify(myShips)}`;
+    if (lastShipsSyncKeyRef.current === syncKey) return;
+    lastShipsSyncKeyRef.current = syncKey;
+
+    if (playerNumber === 1) {
+      void syncStateToSupabase({ player1_ships: myShips, player1_placed_ships: true });
+    } else {
+      void syncStateToSupabase({ player2_ships: myShips, player2_placed_ships: true });
+    }
+    void recordEvent("ships_placed", myShips, playerNumber);
+  }, [gameState, myShips, playerNumber, recordEvent, syncStateToSupabase]);
 
   useEffect(() => {
-    switch (shipTilesState) {
-      case 0:
-        break;
-      case ships.length:
-        dispatch({ type: COMPLETE_SELECTION });
-        break;
-      default:
-        const { numOfTiles, name } = ships[shipTilesState];
-        dispatch({
-          type: NEW_MESSAGE,
-          message: makeMsgForSelectingTiles(name, numOfTiles),
-        });
+    if (gameState !== 1) return;
+    if (shipTilesState === ships.length) {
+      dispatch({ type: COMPLETE_SELECTION });
+      return;
     }
-  }, [shipTilesState]);
+    const { numOfTiles, name } = ships[shipTilesState];
+    dispatch({
+      type: NEW_MESSAGE,
+      message: makeMsgForSelectingTiles(name, numOfTiles),
+    });
+  }, [gameState, shipTilesState]);
 
   const newGame = async () => {
     if (!roomId || currentRoom?.status !== "completed") return;
@@ -691,6 +780,9 @@ const useGame = () => {
       const room = await requestGameRematch(roomId, playerId);
       setCurrentRoom(room);
       if (room.status === "playing") {
+        terminalStateHandledRef.current = null;
+        lastShipsSyncKeyRef.current = null;
+        returnToCityRef.current = false;
         dispatch({ type: NEW_GAME });
         await recordEvent("new_game", null, playerNumber);
       }

@@ -3,7 +3,8 @@
   color: #ffffff;
   position: relative;
   text-align: center;
-  min-width: 8em;
+  flex: 0 0 clamp(6rem, 8vw, 8rem);
+  min-width: 6rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -14,15 +15,40 @@
 }
 
 .display .ship-list:first-child {
-  left: 1.5em;
-  padding: 1em 2.5em 1em 1em;
+  left: auto;
+  padding: 1em;
   border-radius: 1.5em 0 0 1.5em;
 }
 
 .display .ship-list:nth-child(2) {
-  right: 1.5em;
-  padding: 1em 1em 1em 2.5em;
+  right: auto;
+  padding: 1em;
   border-radius: 0 1.5em 1.5em 0;
+}
+
+@media (max-width: 980px) {
+  .ship-list,
+  .display .ship-list:first-child,
+  .display .ship-list:nth-child(2) {
+    left: auto;
+    right: auto;
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+    padding: 0.65rem;
+    border-radius: 0.75rem;
+  }
+
+  .ship-list > div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem 0.75rem;
+  }
+
+  .ship-list > div > div {
+    margin: 0.25rem 0;
+  }
 }
 
 .ship-list button {

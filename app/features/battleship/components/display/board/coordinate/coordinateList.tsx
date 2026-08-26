@@ -1,5 +1,5 @@
 import React from "react";
-import CoordinateListItem from "./CoordinateListItem";
+import CoordinateListItem from "./coordinateListItem";
 import {
   checkIfSameCoordinate,
   checkIfLstIncludesCoordinate,

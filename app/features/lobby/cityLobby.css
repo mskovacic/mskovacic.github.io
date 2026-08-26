@@ -13,6 +13,9 @@
 .lobby-brand strong { display: block; font: 700 13px/1 'Urbanist', sans-serif; }
 .lobby-brand small { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; letter-spacing: .13em; text-transform: uppercase; }
 .lobby-status { margin-left: auto; color: #cbe1dc; font-size: 12px; letter-spacing: .04em; }
+.rejoin-game-button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255, 209, 126, .55); border-radius: 999px; padding: 8px 12px; background: rgba(255, 209, 126, .14); color: #ffe0a5; font: 700 10px 'Open Sans', sans-serif; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+.rejoin-game-button:hover { background: rgba(255, 209, 126, .24); }
+.rejoin-game-button span { font-size: 14px; line-height: 1; }
 .live-dot, .notice-pulse { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #80e2b7; box-shadow: 0 0 0 4px rgba(128, 226, 183, .13); }
 .lobby-user { display: flex; align-items: center; gap: 9px; font-size: 12px; }
 .mini-avatar { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; background: #74a9ee; color: #10283b; font-weight: 700; }
@@ -81,7 +84,7 @@
 .username-modal button:disabled { cursor: not-allowed; opacity: .45; }
 .lobby-loading { display: grid; min-height: calc(100vh - 64px); place-items: center; background: #17333e; color: #d9eee6; font: 600 14px 'Urbanist', sans-serif; letter-spacing: .14em; text-transform: uppercase; }
 .character-creator { position: absolute; z-index: 4; inset: 0; display: flex; align-items: center; justify-content: space-between; gap: clamp(30px, 8vw, 130px); padding: 80px clamp(20px, 8vw, 120px) 40px; pointer-events: none; }
-.creator-copy { width: min(400px, 38vw); margin-top: -28px; }
+.creator-copy { order: 2; width: min(400px, 38vw); margin-top: -28px; }
 .creator-copy h1 { margin: 0; color: #f0fbf6; font: 500 clamp(42px, 5.5vw, 78px)/.9 'Urbanist', sans-serif; letter-spacing: -.07em; text-shadow: 0 4px 25px rgba(3, 21, 33, .5); }
 .creator-copy h1 em { color: #ffd17e; font-family: Georgia, serif; font-weight: 400; }
 .creator-description { max-width: 310px; margin: 25px 0 0; color: #d2e6e1; font-size: 13px; line-height: 1.75; text-shadow: 0 2px 13px rgba(3, 21, 33, .6); }
@@ -89,7 +92,7 @@
 .creator-progress > span { width: 23px; height: 2px; background: rgba(220, 242, 232, .4); }
 .creator-progress .progress-active { background: #ffd17e; }
 .creator-progress small { margin-left: 8px; color: #d2e7e0; font-size: 8px; letter-spacing: .16em; }
-.creator-panel { box-sizing: border-box; width: min(390px, 100%); max-height: calc(100vh - 105px); overflow: auto; padding: 27px 29px 23px; border: 1px solid rgba(231, 247, 239, .28); border-radius: 3px; background: rgba(13, 37, 50, .79); box-shadow: 0 25px 75px rgba(3, 17, 27, .42); backdrop-filter: blur(17px); pointer-events: auto; }
+.creator-panel { order: 1; box-sizing: border-box; width: min(390px, 100%); max-height: calc(100vh - 105px); overflow: auto; padding: 27px 29px 23px; border: 1px solid rgba(231, 247, 239, .28); border-radius: 3px; background: rgba(13, 37, 50, .79); box-shadow: 0 25px 75px rgba(3, 17, 27, .42); backdrop-filter: blur(17px); pointer-events: auto; }
 .creator-panel-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 23px; }
 .creator-panel-header h2 { margin: -2px 0 0; color: #f0fbf6; font: 600 22px/1.1 'Urbanist', sans-serif; letter-spacing: -.04em; }
 .creator-orbit { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #ffd17e; border-radius: 50%; color: #ffd17e; }
@@ -126,6 +129,7 @@
   .city-lobby { min-height: calc(100vh - 56px); }
   .lobby-header { padding: 17px 18px; gap: 10px; }
   .lobby-status { margin-left: auto; font-size: 10px; }
+  .rejoin-game-button { padding: 7px 9px; font-size: 8px; }
   .lobby-user { display: none; }
   .lobby-intro { top: 92px; left: 20px; }
   .lobby-intro h1 { font-size: 39px; }
@@ -145,11 +149,11 @@
   .chat-feed-list { max-height: 125px; }
   .username-modal { padding: 32px 26px 28px; }
   .character-creator { display: block; overflow: auto; padding: 85px 18px 28px; }
-  .creator-copy { width: auto; margin: 0 2px 24px; }
+  .creator-copy { order: 1; width: auto; margin: 0 2px 24px; }
   .creator-copy h1 { font-size: 46px; }
   .creator-description { max-width: 265px; margin-top: 14px; font-size: 11px; }
   .creator-progress { margin-top: 22px; }
-  .creator-panel { width: 100%; max-height: none; padding: 22px 20px 18px; }
+  .creator-panel { order: 2; width: 100%; max-height: none; padding: 22px 20px 18px; }
   .creator-panel-header h2 { font-size: 19px; }
   .game-picker { bottom: auto; top: calc(100% + 8px); }
   .game-invite-modal { padding: 25px 22px 22px; }

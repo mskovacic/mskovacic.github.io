@@ -1,5 +1,5 @@
 import React from "react";
-import CoordinateLabelListIItem from "./CoordinateLabelListItem";
+import CoordinateLabelListIItem from "./coordinateLabelListItem";
 
 const CoordinateLabelList = ({ isRow }) => {
   const parentDivClassName = isRow

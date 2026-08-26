@@ -1,6 +1,6 @@
 .coordinate-space {
-  width: 1.2em;
-  height: 1.2em;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .row-column-label {
@@ -8,6 +8,7 @@
 }
 
 .row-column {
+  --cell-size: clamp(1.65rem, 3.4vw, 2.35rem);
   display: flex;
 }
 
@@ -16,8 +17,8 @@
 }
 
 .coordinate-label-column {
-  width: 2.5375em;
-  height: 1.5em;
+  width: var(--cell-size);
+  height: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -25,8 +26,8 @@
 }
 
 .coordinate-label-row {
-  width: 1.5em;
-  height: 2.5375em;
+  width: 1.5rem;
+  height: var(--cell-size);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -34,7 +35,12 @@
 }
 
 .coordinate {
-  border: 0.15em solid #ffffff;
+  width: max-content;
+  overflow: hidden;
+  border: 0.15em solid #14213d;
+  border-radius: 0.25rem;
+  background-color: #1d687b;
+  box-shadow: 0 0.35rem 0.8rem rgba(20, 33, 61, 0.18);
 }
 
 .coordinate > .row > .square:first-child {
@@ -46,17 +52,32 @@
 }
 
 .square {
-  width: 2em;
-  height: 2em;
+  box-sizing: border-box;
+  width: var(--cell-size);
+  height: var(--cell-size);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-top: 0.15em solid #ffffff;
-  border-left: 0.15em solid #ffffff;
+  background-color: #2b8092;
+  border-top: 0.1em solid rgba(255, 255, 255, 0.72);
+  border-left: 0.1em solid rgba(255, 255, 255, 0.72);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 120ms ease, filter 120ms ease;
+}
+
+.square:hover {
+  filter: brightness(1.14);
 }
 
 .row {
   display: flex;
+}
+
+@media (max-width: 520px) {
+  .row-column {
+    --cell-size: clamp(1.55rem, 8vw, 2rem);
+  }
 }
 
 .carrier {

@@ -1,7 +1,7 @@
 import React from "react";
-import "./Coordinate.css";
-import CoordinateList from "./CoordinateList";
-import CoordinateLabelList from "./CoordinateLabelList";
+import "./coordinate.css";
+import CoordinateList from "./coordinateList";
+import CoordinateLabelList from "./coordinateLabelList";
 
 const Coordinate = ({ placedShips, clickTile, chosenTiles, shot, myBoard }) => {
   const lst = [];

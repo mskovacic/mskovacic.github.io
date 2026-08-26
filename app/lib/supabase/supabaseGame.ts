@@ -173,6 +173,26 @@ export async function touchGameRoomPlayer(roomId: string, playerNumber: 1 | 2): 
   if (error) throw error;
 }
 
+/**
+ * Mark a player's session as gone and resolve the room when both players have
+ * left. The lifecycle RPC uses the last-seen timestamps to complete the room
+ * atomically, so a stale room cannot remain rejoinable indefinitely.
+ */
+export async function leaveGameRoom(roomId: string, playerNumber: 1 | 2): Promise<GameRoom | null> {
+  const supabase = createClient();
+  if (!supabase) throw new Error("Supabase client not initialized");
+
+  const column = playerNumber === 1 ? "player1_last_seen_at" : "player2_last_seen_at";
+  const { error } = await supabase
+    .from("battleship_rooms")
+    .update({ [column]: new Date(0).toISOString() })
+    .eq("id", roomId)
+    .neq("status", "completed");
+
+  if (error) throw error;
+  return resolveInactiveGameRoom(roomId);
+}
+
 export async function completeGameRoom(
   roomId: string,
   winner: "player1" | "player2",
@@ -342,13 +362,17 @@ export function subscribeToGameState(
     .on(
       "postgres_changes",
       {
-        event: "*",
+        event: "UPDATE",
         schema: "public",
         table: "battleship_game_states",
         filter: `room_id=eq.${roomId}`,
       },
       (payload) => {
-        callback(payload.new);
+        // A deleted room cascades to its state row. Do not feed the empty
+        // DELETE payload into the game reducer while the room is completing.
+        const nextState = payload.new as Partial<GameState>;
+        if (!nextState?.room_id) return;
+        callback(nextState as GameState);
       }
     )
     .subscribe();
@@ -379,7 +403,9 @@ export function subscribeToGameEvents(
         filter: `room_id=eq.${roomId}`,
       },
       (payload) => {
-        callback(payload.new);
+        const event = payload.new as Record<string, unknown>;
+        if (!event?.id) return;
+        callback(event);
       }
     )
     .subscribe();
@@ -444,7 +470,9 @@ export function subscribeToGameRoom(
         filter: `id=eq.${roomId}`,
       },
       (payload) => {
-        callback(payload.new);
+        const nextRoom = payload.new as Partial<GameRoom>;
+        if (!nextRoom?.id) return;
+        callback(nextRoom as GameRoom);
       }
     )
     .subscribe();

@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { createClient } from "~/lib/supabase/client";
-import { createGameRoom, getPersistentPlayerId, joinGameRoom } from "~/lib/supabase/supabaseGame";
+import {
+  createGameRoom,
+  getPersistentPlayerId,
+  getPlayerActiveGames,
+  joinGameRoom,
+  resolveInactiveGameRoom,
+  type GameRoom,
+} from "~/lib/supabase/supabaseGame";
 
 type Point = { x: number; z: number };
 type Resident = {
@@ -294,6 +301,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [gameInvite, setGameInvite] = useState<GameInvitation | null>(null);
   const [gameInviteBusy, setGameInviteBusy] = useState(false);
+  const [activeRoom, setActiveRoom] = useState<Pick<GameRoom, "id" | "status"> | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "online" | "offline">("connecting");
   const [selected, setSelected] = useState<Resident | null>(null);
   const [interactionMode, setInteractionMode] = useState<"profile" | "messages">("profile");
@@ -302,6 +310,43 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
   const [isRunning, setIsRunning] = useState(false);
   const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
   const gameReady = profileLoaded && !showCreator;
+
+  useEffect(() => {
+    if (!gameReady) {
+      setActiveRoom(null);
+      return;
+    }
+
+    let isMounted = true;
+    const refreshActiveRoom = async () => {
+      try {
+        const rooms = await getPlayerActiveGames(getPersistentPlayerId());
+        const latestRooms = await Promise.all(rooms.map(async (room) => {
+          try {
+            // Resolve rooms whose last player presence has expired before
+            // offering a rejoin action in the city.
+            return await resolveInactiveGameRoom(room.id) ?? room;
+          } catch {
+            return room;
+          }
+        }));
+        const availableRoom = latestRooms.find((room) => room.status !== "completed");
+        if (isMounted) {
+          setActiveRoom(availableRoom ? { id: availableRoom.id, status: availableRoom.status } : null);
+        }
+      } catch {
+        if (isMounted) setActiveRoom(null);
+      }
+    };
+
+    void refreshActiveRoom();
+    const refreshIntervalId = window.setInterval(() => void refreshActiveRoom(), 5_000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(refreshIntervalId);
+    };
+  }, [gameReady]);
 
   useEffect(() => {
     const feed = chatFeedRef.current;
@@ -810,6 +855,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       <header className="lobby-header">
         <div className="lobby-brand"><span className="brand-mark">✦</span><div><strong>NEON DISTRICT</strong><small>social game lobby</small></div></div>
         <div className="lobby-status"><span className="live-dot" /> {realtimeStatus === "online" ? `${Object.keys(remotePlayers).length + 1} players online` : realtimeStatus === "connecting" ? "Connecting to city..." : "Offline preview"}</div>
+        {gameReady && activeRoom && <button className="rejoin-game-button" onClick={() => window.location.assign(`/battleship?room=${encodeURIComponent(activeRoom.id)}`)}><span>↻</span> Rejoin Battleship</button>}
         <div className="lobby-user"><span className="mini-avatar">{username.slice(0, 1).toUpperCase() || "?"}</span>{username || "Visitor"}</div>
       </header>
       {gameReady && <>

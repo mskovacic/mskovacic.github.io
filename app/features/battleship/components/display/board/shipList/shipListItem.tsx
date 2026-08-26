@@ -1,5 +1,5 @@
 import React from "react";
-import "./ShipList.css";
+import "./shipList.css";
 import { checkIfSink } from "../../../../helpers";
 
 const ShipListItem = ({ ship: { name, coordinates }, shot }) => {
