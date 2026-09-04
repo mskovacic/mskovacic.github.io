@@ -105,9 +105,6 @@ const coinPlacements = [
   { x: -3.65, y: 2.15, z: 1.1 }, { x: 3.7, y: 2.15, z: 1.3 },
 ];
 
-const skinOptions = [0xf6d1b1, 0xd99b72, 0xb97955, 0x78472f];
-const outfitOptions = [0x70a8ef, 0xf58f70, 0x83d1c7, 0xb39bf4, 0xf2c66d];
-
 function makeMaterial(color: number, roughness = 0.72) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.08 });
 }
@@ -1230,8 +1227,6 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
           <div className="creator-section"><label className="creator-label">GENDER</label><div className="choice-row"><button className={profile.gender === "feminine" ? "choice selected" : "choice"} onClick={() => setProfile((current) => ({ ...current, gender: "feminine" }))}>Female</button><button className={profile.gender === "masculine" ? "choice selected" : "choice"} onClick={() => setProfile((current) => ({ ...current, gender: "masculine" }))}>Male</button></div></div>
           <div className="creator-section"><label className="creator-label">CHOOSE A BODY</label><div className="body-choice-grid">{(["a", "b", "c", "d", "e", "f"] as const).map((variant, index) => <button key={variant} className={profile.bodyVariant === variant ? "body-choice selected" : "body-choice"} onClick={() => setProfile((current) => ({ ...current, bodyVariant: variant }))}><span>{index + 1}</span><small>Body {variant.toUpperCase()}</small></button>)}</div></div>
           <div className="creator-section"><label className="creator-label">CHOOSE A FACE</label><div className="face-choice-grid">{(["friendly", "calm", "focused", "cheerful", "cool", "surprised"] as const).map((face) => <button key={face} className={profile.faceVariant === face ? "face-choice selected" : "face-choice"} onClick={() => setProfile((current) => ({ ...current, faceVariant: face }))}>{face}</button>)}</div></div>
-          <div className="creator-section"><label className="creator-label">SKIN TONE</label><div className="swatch-row">{skinOptions.map((color) => <button key={color} aria-label={`Skin tone ${color}`} className={profile.skinColor === color ? "swatch selected" : "swatch"} style={{ backgroundColor: `#${color.toString(16)}` }} onClick={() => setProfile((current) => ({ ...current, skinColor: color }))} />)}</div></div>
-          <div className="creator-section"><label className="creator-label">OUTFIT COLOR</label><div className="swatch-row">{outfitOptions.map((color) => <button key={color} aria-label={`Outfit color ${color}`} className={profile.outfitColor === color ? "swatch selected" : "swatch"} style={{ backgroundColor: `#${color.toString(16)}` }} onClick={() => setProfile((current) => ({ ...current, outfitColor: color }))} />)}</div></div>
           <button className="enter-city-button" onClick={saveUsername} disabled={!nameDraft.trim()}>Enter the city <span>→</span></button>
           <p className="creator-footnote">Your choices are saved on this device · <a href="https://kenney.nl/assets/platformer-kit" target="_blank" rel="noreferrer">Platformer Kit</a> + <a href="https://kenney.nl/assets/mini-characters" target="_blank" rel="noreferrer">Mini Characters</a> by Kenney (CC0)</p>
         </div>
