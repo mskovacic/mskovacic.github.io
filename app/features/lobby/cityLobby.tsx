@@ -31,7 +31,7 @@ type CharacterProfile = {
   gender: "feminine" | "masculine" | "androgynous";
   characterSet: "mini";
   bodyVariant: "a" | "b" | "c" | "d" | "e" | "f";
-  faceVariant: "friendly" | "calm" | "focused" | "cheerful" | "cool" | "surprised";
+  faceVariant: "a" | "b" | "c" | "d" | "e" | "f";
   /** @deprecated kept only to migrate profiles saved by the previous creator. */
   miniCharacter?: "a" | "c";
 };
@@ -87,8 +87,10 @@ const defaultProfile: CharacterProfile = {
   gender: "androgynous",
   characterSet: "mini",
   bodyVariant: "a",
-  faceVariant: "friendly",
+  faceVariant: "a",
 };
+
+const kenneyFaceVariants = ["a", "b", "c", "d", "e", "f"] as const;
 
 const terrainSurfaces: TerrainSurface[] = [
   { x: 0, z: 0, halfWidth: 5.2, halfDepth: 5.2, top: 1 },
@@ -151,6 +153,12 @@ function characterVariant(appearance: CharacterProfile) {
   return `${family}-${appearance.bodyVariant}`;
 }
 
+function normalizeFaceVariant(value: unknown): CharacterProfile["faceVariant"] {
+  return kenneyFaceVariants.includes(value as CharacterProfile["faceVariant"])
+    ? value as CharacterProfile["faceVariant"]
+    : "a";
+}
+
 function normalizeProfile(appearance?: Partial<CharacterProfile>): CharacterProfile {
   const legacyVariant = appearance?.miniCharacter === "c" ? "c" : undefined;
   return {
@@ -158,7 +166,7 @@ function normalizeProfile(appearance?: Partial<CharacterProfile>): CharacterProf
     ...(appearance ?? {}),
     characterSet: "mini",
     bodyVariant: appearance?.bodyVariant ?? legacyVariant ?? "a",
-    faceVariant: appearance?.faceVariant ?? "friendly",
+    faceVariant: normalizeFaceVariant((appearance as { faceVariant?: unknown } | undefined)?.faceVariant),
   };
 }
 
@@ -172,52 +180,55 @@ function applyKenneyMaterials(model: THREE.Group, appearance: CharacterProfile, 
         ? (isPlayer ? 0x263b58 : 0x32445b)
         : appearance.outfitColor;
     // Clone materials per avatar so one player's customization never changes
-    // another player's appearance.
-    child.material = makeMaterial(color, 0.82);
+    // another player's appearance. Keep the Kenney map on the cloned material;
+    // replacing it with a new flat material makes the old procedural look
+    // appear even though the Kenney model has already loaded.
+    const tintMaterial = (source: THREE.Material) => {
+      const material = source.clone() as THREE.MeshStandardMaterial;
+      material.color?.set(color);
+      material.roughness = 0.82;
+      material.metalness = 0.08;
+      return material;
+    };
+    child.material = Array.isArray(child.material)
+      ? child.material.map(tintMaterial)
+      : tintMaterial(child.material);
     child.castShadow = true;
     child.receiveShadow = true;
   });
 }
 
-function addMiniFace(parent: THREE.Group, face: CharacterProfile["faceVariant"]) {
-  const faceGroup = new THREE.Group();
-  faceGroup.userData.faceDetail = true;
-  const eyeMaterial = makeMaterial(0x132235, 0.35);
-  const variants: Record<CharacterProfile["faceVariant"], { eye: number; mouth: number; mouthHeight: number }> = {
-    friendly: { eye: 0.036, mouth: 0.18, mouthHeight: 0.028 },
-    calm: { eye: 0.03, mouth: 0.12, mouthHeight: 0.018 },
-    focused: { eye: 0.028, mouth: 0.1, mouthHeight: 0.014 },
-    cheerful: { eye: 0.04, mouth: 0.22, mouthHeight: 0.035 },
-    cool: { eye: 0.024, mouth: 0.14, mouthHeight: 0.018 },
-    surprised: { eye: 0.046, mouth: 0.07, mouthHeight: 0.07 },
-  };
-  const style = variants[face];
-  [-0.11, 0.11].forEach((x) => {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(style.eye, 8, 6), eyeMaterial);
-    eye.position.set(x, 1.76, 0.43);
-    faceGroup.add(eye);
-  });
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(style.mouth, style.mouthHeight, 0.028), eyeMaterial);
-  mouth.position.set(0, 1.61, 0.43);
-  faceGroup.add(mouth);
-  if (face === "focused" || face === "cool") {
-    [-0.11, 0.11].forEach((x) => {
-      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.018, 0.025), eyeMaterial);
-      brow.position.set(x, 1.84, 0.43);
-      brow.rotation.z = face === "focused" ? (x < 0 ? -0.12 : 0.12) : 0;
-      faceGroup.add(brow);
-    });
-  }
-  parent.add(faceGroup);
+function applyKenneyFaceVariant(model: THREE.Group, faceSource: THREE.Group, appearance: CharacterProfile, isPlayer: boolean) {
+  const currentHead = model.getObjectByName("head-mesh");
+  const faceModel = cloneSkinnedModel(faceSource) as THREE.Group;
+  applyKenneyMaterials(faceModel, appearance, isPlayer);
+  const faceHead = faceModel.getObjectByName("head-mesh");
+  if (!(currentHead instanceof THREE.SkinnedMesh) || !(faceHead instanceof THREE.SkinnedMesh)) return;
+
+  // Keep the body's original SkinnedMesh and skeleton. The face assets use
+  // the same bind pose and bone names, so only their geometry/material need
+  // to be swapped. Mounting a cloned face scene beside the body creates a
+  // second skeleton, which leaves the face behind when the body animates.
+  currentHead.geometry = faceHead.geometry;
+  currentHead.material = faceHead.material;
+  currentHead.visible = true;
 }
 
 async function hydrateAvatarWithKenney(avatar: THREE.Group, appearance: CharacterProfile, isPlayer: boolean, variant: string) {
+  // Do not show the procedural placeholder while the Kenney asset is loading.
+  // This also hides an already-rendered avatar while it is being replaced.
+  avatar.visible = false;
   const appearanceKey = JSON.stringify(appearance);
-  const modelSource = await loadMiniCharacter(variant);
-  if (!modelSource || avatar.userData.appearanceKey !== appearanceKey) return;
+  const family = appearance.gender === "masculine" ? "male" : "female";
+  const [modelSource, faceSource] = await Promise.all([
+    loadMiniCharacter(variant),
+    loadMiniCharacter(`${family}-${appearance.faceVariant}`),
+  ]);
+  if (!modelSource || !faceSource || avatar.userData.appearanceKey !== appearanceKey) return;
 
   const model = cloneSkinnedModel(modelSource) as THREE.Group;
   applyKenneyMaterials(model, appearance, isPlayer);
+  if (variant !== `${family}-${appearance.faceVariant}`) applyKenneyFaceVariant(model, faceSource, appearance, isPlayer);
   // Normalize the downloaded model to the same two-unit height as the
   // procedural fallback, keeping movement and camera tuning unchanged.
   const bounds = new THREE.Box3().setFromObject(model);
@@ -229,11 +240,10 @@ async function hydrateAvatarWithKenney(avatar: THREE.Group, appearance: Characte
   const label = avatar.children.find((child) => child instanceof THREE.Sprite);
   avatar.clear();
   avatar.add(model);
-  addMiniFace(avatar, appearance.faceVariant);
   if (label) avatar.add(label);
   const limbs: THREE.Object3D[] = [];
   model.traverse((child) => {
-    if (["leg-left", "leg-right", "arm-left", "arm-right"].includes(child.name)) limbs.push(child);
+    if (child.visible && ["leg-left", "leg-right", "arm-left", "arm-right"].includes(child.name)) limbs.push(child);
   });
   avatar.userData.limbs = limbs;
   const clips = modelSource.userData.animations as THREE.AnimationClip[] | undefined;
@@ -246,6 +256,7 @@ async function hydrateAvatarWithKenney(avatar: THREE.Group, appearance: Characte
     avatar.userData.animationState = "";
   }
   avatar.userData.kenneyReady = true;
+  avatar.visible = true;
 }
 
 function updateAvatarAnimation(avatar: THREE.Group, moving: boolean, running: boolean, jumping: boolean) {
@@ -263,6 +274,9 @@ function updateAvatarAnimation(avatar: THREE.Group, moving: boolean, running: bo
 function createAvatar(color: number, isPlayer = false, appearance: CharacterProfile = defaultProfile) {
   const avatar = new THREE.Group();
   avatar.userData = { isPlayer, limbs: [] as THREE.Object3D[], appearanceKey: JSON.stringify(appearance) };
+  // The procedural meshes below are only a loading placeholder. Keep the
+  // avatar hidden until the Kenney model has replaced them.
+  avatar.visible = false;
 
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.38, 0.72, 4, 10), makeMaterial(color));
   body.position.y = 1.05;
@@ -468,6 +482,7 @@ function buildCity(scene: THREE.Scene) {
 export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const keysRef = useRef<Record<string, boolean>>({});
   const joystickRef = useRef({ x: 0, y: 0, active: false });
   const chatFeedRef = useRef<HTMLDivElement>(null);
@@ -488,6 +503,10 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
   const [remotePlayers, setRemotePlayers] = useState<Record<string, LobbyPlayerState>>({});
   const [chatMessages, setChatMessages] = useState<LobbyMessage[]>([]);
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
+  const [feedbackComment, setFeedbackComment] = useState("");
   const [gameInvite, setGameInvite] = useState<GameInvitation | null>(null);
   const [gameInviteBusy, setGameInviteBusy] = useState(false);
   const [activeRoom, setActiveRoom] = useState<Pick<GameRoom, "id" | "status"> | null>(null);
@@ -498,7 +517,49 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
   const [isMoving, setIsMoving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
+  const [fps, setFps] = useState<number | null>(null);
   const gameReady = profileLoaded && !showCreator;
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+
+    const closeMenuOnOutsideClick = (event: PointerEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    const closeMenuOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeMenuOnOutsideClick);
+    document.addEventListener("keydown", closeMenuOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenuOnOutsideClick);
+      document.removeEventListener("keydown", closeMenuOnEscape);
+    };
+  }, [profileMenuOpen]);
+
+  useEffect(() => {
+    if (!gameReady) return;
+
+    let frameCount = 0;
+    let intervalStart = performance.now();
+    let animationFrame = 0;
+    const measureFrame = (timestamp: number) => {
+      frameCount += 1;
+      const elapsed = timestamp - intervalStart;
+      if (elapsed >= 1000) {
+        setFps(Math.round((frameCount * 1000) / elapsed));
+        frameCount = 0;
+        intervalStart = timestamp;
+      }
+      animationFrame = window.requestAnimationFrame(measureFrame);
+    };
+
+    animationFrame = window.requestAnimationFrame(measureFrame);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [gameReady]);
 
   useEffect(() => {
     if (!gameReady) {
@@ -577,6 +638,34 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     setNotice("Your look is ready. Welcome to the city.");
   }, [nameDraft, onUsernameChange, profile]);
 
+  const openFeedback = () => {
+    setProfileMenuOpen(false);
+    setFeedbackRating(null);
+    setFeedbackComment("");
+    setFeedbackOpen(true);
+  };
+
+  const closeFeedback = () => {
+    setFeedbackOpen(false);
+    setFeedbackRating(null);
+    setFeedbackComment("");
+  };
+
+  const submitFeedback = () => {
+    if (!feedbackRating) return;
+    try {
+      window.localStorage.setItem("city_lobby_feedback", JSON.stringify({
+        rating: feedbackRating,
+        comment: feedbackComment.trim(),
+        submittedAt: new Date().toISOString(),
+      }));
+    } catch {
+      // Feedback should still close successfully if local storage is unavailable.
+    }
+    closeFeedback();
+    setNotice("Thanks for helping shape the city.");
+  };
+
   useEffect(() => {
     const scene = sceneRef.current;
     const previous = playerRef.current;
@@ -619,16 +708,18 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     let cancelled = false;
     const timer = new THREE.Timer();
     timer.connect(document);
-    void loadMiniCharacter(characterVariant(profile)).then((source) => {
-      if (!source || cancelled) return;
+    const bodyVariant = characterVariant(profile);
+    const family = profile.gender === "masculine" ? "male" : "female";
+    void Promise.all([loadMiniCharacter(bodyVariant), loadMiniCharacter(`${family}-${profile.faceVariant}`)]).then(([source, faceSource]) => {
+      if (!source || !faceSource || cancelled) return;
       const model = cloneSkinnedModel(source) as THREE.Group;
       applyKenneyMaterials(model, profile, true);
+      if (bodyVariant !== `${family}-${profile.faceVariant}`) applyKenneyFaceVariant(model, faceSource, profile, true);
       const bounds = new THREE.Box3().setFromObject(model);
       const scale = 2.25 / Math.max(bounds.max.y - bounds.min.y, 0.001);
       model.scale.setScalar(scale);
       model.position.y = -bounds.min.y * scale;
       previewAvatar.add(model);
-      addMiniFace(previewAvatar, profile.faceVariant);
       const clips = source.userData.animations as THREE.AnimationClip[] | undefined;
       const idle = clips?.find((clip) => clip.name.toLowerCase() === "idle");
       if (idle) {
@@ -801,7 +892,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     sceneRef.current = scene;
     buildCity(scene);
 
-    const camera = new THREE.PerspectiveCamera(48, mount.clientWidth / Math.max(mount.clientHeight, 1), 0.1, 120);
+    const camera = new THREE.PerspectiveCamera(window.matchMedia("(max-width: 720px)").matches ? 58 : 48, mount.clientWidth / Math.max(mount.clientHeight, 1), 0.1, 120);
     camera.position.set(0, 7, 10);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -816,7 +907,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     playerRef.current = player;
     void hydrateAvatarWithKenney(player, profile, true, characterVariant(profile));
     residents.forEach((resident) => {
-      const npcAppearance: CharacterProfile = { ...defaultProfile, outfitColor: resident.color, gender: resident.id === "kai" || resident.id === "leo" ? "masculine" : "feminine", bodyVariant: resident.id === "mira" || resident.id === "leo" ? "c" : "a", faceVariant: resident.id === "kai" ? "cheerful" : resident.id === "zoe" ? "calm" : "friendly" };
+      const npcAppearance: CharacterProfile = { ...defaultProfile, outfitColor: resident.color, gender: resident.id === "kai" || resident.id === "leo" ? "masculine" : "feminine", bodyVariant: resident.id === "mira" || resident.id === "leo" ? "c" : "a", faceVariant: resident.id === "kai" ? "b" : resident.id === "zoe" ? "c" : "a" };
       const npc = createAvatar(resident.color, false, npcAppearance);
       npc.position.set(resident.position.x, resident.position.y ?? 1, resident.position.z);
       npc.userData.residentId = resident.id;
@@ -1181,14 +1272,23 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       <div className={`creator-wallpaper ${showCreator ? "creator-wallpaper-visible" : ""}`} />
       <div ref={mountRef} className="city-canvas" aria-label="3D city lobby" />
       <div className="city-vignette" />
-      <header className="lobby-header">
+      {gameReady && <header className="lobby-header">
         <div className="lobby-brand"><span className="brand-mark">✦</span><div><strong>NEON DISTRICT</strong><small>social game lobby</small></div></div>
         <div className="lobby-status"><span className="live-dot" /> {realtimeStatus === "online" ? `${Object.keys(remotePlayers).length + 1} players online` : realtimeStatus === "connecting" ? "Connecting to city..." : "Offline preview"}</div>
+        <div className="lobby-fps" aria-label={fps === null ? "Frames per second: measuring" : `Frames per second: ${fps}`}>FPS {fps ?? "—"}</div>
         {gameReady && activeRoom && <button className="rejoin-game-button" onClick={() => window.location.assign(`/battleship?room=${encodeURIComponent(activeRoom.id)}`)}><span>↻</span> Rejoin Battleship</button>}
-        <div className="lobby-user"><span className="mini-avatar">{username.slice(0, 1).toUpperCase() || "?"}</span>{username || "Visitor"}</div>
-      </header>
+        <div className="profile-menu-container" ref={profileMenuRef}>
+          <button className="lobby-user" onClick={() => setProfileMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={profileMenuOpen} aria-label="Open profile menu">
+            <span className="mini-avatar">{username.slice(0, 1).toUpperCase() || "?"}</span><span className="lobby-user-name">{username || "Visitor"}</span>
+          </button>
+          {profileMenuOpen && <div className="profile-menu" role="menu">
+            <button className="profile-menu-item" role="menuitem" onClick={() => { setShowCreator(true); setSelected(null); setGameMenuOpen(false); setProfileMenuOpen(false); }}><span>✦</span> Return to selection screen <b>→</b></button>
+            <button className="profile-menu-item" role="menuitem" onClick={openFeedback}><span>☺</span> Rate this <b>→</b></button>
+          </div>}
+        </div>
+      </header>}
       {gameReady && <>
-        <section className="lobby-intro"><p className="eyebrow">DISTRICT 01 · CENTRAL PLAZA</p><h1>Find your <em>people.</em></h1><p className="intro-copy">Walk the city, meet fellow players, and turn a hello into your next match.</p></section>
+        <section className="lobby-intro"><p className="eyebrow">DISTRICT 01 · CENTRAL PLAZA</p><h1>Dare to <em>explore.</em></h1><p className="intro-copy">Walk the city, meet fellow players, and turn a hello into your next match.</p></section>
         <div className="city-notice"><span className="notice-pulse" />{notice}</div>
         <section className="chat-feed" aria-label="Lobby chat">
           <div className="chat-feed-header"><span className="live-dot" /> DISTRICT CHAT <small>{chatMessages.length ? `${chatMessages.length} messages` : "No messages yet"}</small></div>
@@ -1226,11 +1326,29 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
           <input id="creator-name" className="creator-name-input" autoFocus={!nameDraft} value={nameDraft} maxLength={20} placeholder="Choose a name" onChange={(event) => setNameDraft(event.target.value)} />
           <div className="creator-section"><label className="creator-label">GENDER</label><div className="choice-row"><button className={profile.gender === "feminine" ? "choice selected" : "choice"} onClick={() => setProfile((current) => ({ ...current, gender: "feminine" }))}>Female</button><button className={profile.gender === "masculine" ? "choice selected" : "choice"} onClick={() => setProfile((current) => ({ ...current, gender: "masculine" }))}>Male</button></div></div>
           <div className="creator-section"><label className="creator-label">CHOOSE A BODY</label><div className="body-choice-grid">{(["a", "b", "c", "d", "e", "f"] as const).map((variant, index) => <button key={variant} className={profile.bodyVariant === variant ? "body-choice selected" : "body-choice"} onClick={() => setProfile((current) => ({ ...current, bodyVariant: variant }))}><span>{index + 1}</span><small>Body {variant.toUpperCase()}</small></button>)}</div></div>
-          <div className="creator-section"><label className="creator-label">CHOOSE A FACE</label><div className="face-choice-grid">{(["friendly", "calm", "focused", "cheerful", "cool", "surprised"] as const).map((face) => <button key={face} className={profile.faceVariant === face ? "face-choice selected" : "face-choice"} onClick={() => setProfile((current) => ({ ...current, faceVariant: face }))}>{face}</button>)}</div></div>
+          <div className="creator-section"><label className="creator-label">CHOOSE A FACE</label><div className="face-choice-grid">{kenneyFaceVariants.map((variant, index) => <button key={variant} className={profile.faceVariant === variant ? "face-choice selected" : "face-choice"} onClick={() => setProfile((current) => ({ ...current, faceVariant: variant }))}><span>{index + 1}</span><small>Face {variant.toUpperCase()}</small></button>)}</div></div>
           <button className="enter-city-button" onClick={saveUsername} disabled={!nameDraft.trim()}>Enter the city <span>→</span></button>
           <p className="creator-footnote">Your choices are saved on this device · <a href="https://kenney.nl/assets/platformer-kit" target="_blank" rel="noreferrer">Platformer Kit</a> + <a href="https://kenney.nl/assets/mini-characters" target="_blank" rel="noreferrer">Mini Characters</a> by Kenney (CC0)</p>
         </div>
         <div ref={previewRef} className="creator-character-preview" aria-label="Mini character preview"><div className="preview-caption"><span className="live-dot" /> LIVE PREVIEW</div></div>
+      </div>}
+      {gameReady && feedbackOpen && <div className="feedback-backdrop">
+        <section className="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
+          <button className="feedback-close" onClick={closeFeedback} aria-label="Close feedback form">×</button>
+          <div className="feedback-icon">♥</div>
+          <p className="eyebrow">CITY FEEDBACK</p>
+          <h2 id="feedback-title">How does the lobby feel?</h2>
+          <p className="feedback-description">Tell us how satisfied you are with your time in the city.</p>
+          <div className="satisfaction-options" role="radiogroup" aria-label="Satisfaction rating">
+            {["😞", "🙁", "😐", "🙂", "😍"].map((emoji, index) => {
+              const rating = index + 1;
+              return <button key={emoji} className={`satisfaction-option ${feedbackRating === rating ? "selected" : ""}`} onClick={() => setFeedbackRating(rating)} role="radio" aria-checked={feedbackRating === rating} aria-label={`${rating} out of 5`} type="button"><span>{emoji}</span><small>{rating}</small></button>;
+            })}
+          </div>
+          <label className="feedback-label" htmlFor="feedback-comment">COMMENT <span>OPTIONAL</span></label>
+          <textarea id="feedback-comment" className="feedback-comment" value={feedbackComment} maxLength={500} placeholder="What would make the city better?" onChange={(event) => setFeedbackComment(event.target.value)} />
+          <div className="feedback-actions"><button className="feedback-cancel" onClick={closeFeedback} type="button">Cancel</button><button className="feedback-submit" onClick={submitFeedback} disabled={!feedbackRating} type="button">Send feedback <span>→</span></button></div>
+        </section>
       </div>}
       {gameReady && gameInvite && <div className="game-invite-backdrop"><section className="game-invite-modal" role="dialog" aria-modal="true" aria-labelledby="game-invite-title"><div className="invite-icon">⚔</div><p className="eyebrow">INCOMING GAME INVITATION</p><h2 id="game-invite-title">{gameInvite.fromName} wants to play.</h2><p><strong>Battleship</strong> · A two-player room is ready for you both.</p><div className="invite-actions"><button className="invite-decline" onClick={() => void respondToGameInvitation(false)} disabled={gameInviteBusy}>Decline</button><button className="invite-accept" onClick={() => void respondToGameInvitation(true)} disabled={gameInviteBusy}>{gameInviteBusy ? "Joining..." : "Accept & join →"}</button></div></section></div>}
     </main>
