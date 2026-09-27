@@ -14,6 +14,18 @@ import {
 
 type Point = { x: number; z: number; y?: number };
 type TerrainSurface = { x: number; z: number; halfWidth: number; halfDepth: number; top: number; raised?: boolean };
+type DistrictId = "district-1" | "district-2";
+type DistrictConfig = {
+  label: string;
+  terrainSurfaces: TerrainSurface[];
+  springPads: Point[];
+  coinPlacements: Array<{ x: number; y: number; z: number }>;
+  gravity: number;
+  jumpVelocity: number;
+  springVelocity: number;
+  walkSpeed: number;
+  runSpeed: number;
+};
 type Resident = {
   id: string;
   name: string;
@@ -106,6 +118,46 @@ const coinPlacements = [
   { x: -2.2, y: 2.15, z: -1.8 }, { x: 2.25, y: 2.15, z: -1.65 }, { x: 0, y: 2.8, z: -3.15 },
   { x: -3.65, y: 2.15, z: 1.1 }, { x: 3.7, y: 2.15, z: 1.3 },
 ];
+
+const moonTerrainSurfaces: TerrainSurface[] = [
+  { x: 0, z: 0, halfWidth: 5.2, halfDepth: 5.2, top: 1 },
+  { x: -2.35, z: -1.8, halfWidth: 0.52, halfDepth: 0.52, top: 1.72, raised: true },
+  { x: 2.35, z: -1.8, halfWidth: 0.52, halfDepth: 0.52, top: 1.72, raised: true },
+  { x: 0, z: -3.15, halfWidth: 0.52, halfDepth: 0.52, top: 2.35, raised: true },
+  { x: -3.6, z: 1.15, halfWidth: 0.52, halfDepth: 0.52, top: 1.72, raised: true },
+  { x: 3.6, z: 1.15, halfWidth: 0.52, halfDepth: 0.52, top: 1.72, raised: true },
+];
+
+const moonSpringPads = [{ x: -0.85, z: 1.85 }, { x: 0.85, z: 1.85 }];
+const moonCoinPlacements = [
+  { x: -2.35, y: 2.12, z: -1.8 }, { x: 2.35, y: 2.12, z: -1.8 }, { x: 0, y: 2.72, z: -3.15 },
+  { x: -3.6, y: 2.12, z: 1.15 }, { x: 3.6, y: 2.12, z: 1.15 },
+];
+
+const districtConfigs: Record<DistrictId, DistrictConfig> = {
+  "district-1": {
+    label: "District 1 · Neon City",
+    terrainSurfaces,
+    springPads,
+    coinPlacements,
+    gravity: 0.007,
+    jumpVelocity: 0.15,
+    springVelocity: 0.22,
+    walkSpeed: 0.07,
+    runSpeed: 0.13,
+  },
+  "district-2": {
+    label: "District 2 · Moon Base",
+    terrainSurfaces: moonTerrainSurfaces,
+    springPads: moonSpringPads,
+    coinPlacements: moonCoinPlacements,
+    gravity: 0.0032,
+    jumpVelocity: 0.12,
+    springVelocity: 0.17,
+    walkSpeed: 0.055,
+    runSpeed: 0.1,
+  },
+};
 
 function makeMaterial(color: number, roughness = 0.72) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.08 });
@@ -214,6 +266,36 @@ function applyKenneyFaceVariant(model: THREE.Group, faceSource: THREE.Group, app
   currentHead.visible = true;
 }
 
+function addMoonCharacterDetails(model: THREE.Group) {
+  const visorMaterial = new THREE.MeshStandardMaterial({
+    color: 0x7ed7f5,
+    emissive: 0x174d78,
+    emissiveIntensity: 0.55,
+    metalness: 0.2,
+    roughness: 0.2,
+    transparent: true,
+    opacity: 0.78,
+  });
+  const head = model.getObjectByName("head");
+  if (head) {
+    const visor = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 8), visorMaterial);
+    visor.name = "moon-visor";
+    visor.position.set(0, 0.01, 0.12);
+    visor.scale.set(1.35, 0.72, 0.45);
+    visor.castShadow = true;
+    head.add(visor);
+  }
+
+  const torso = model.getObjectByName("torso");
+  if (torso) {
+    const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.17, 0.055), makeMaterial(0xc9e7ee, 0.48));
+    backpack.name = "moon-backpack";
+    backpack.position.set(0, 0.02, -0.085);
+    backpack.castShadow = true;
+    torso.add(backpack);
+  }
+}
+
 async function hydrateAvatarWithKenney(avatar: THREE.Group, appearance: CharacterProfile, isPlayer: boolean, variant: string) {
   // Do not show the procedural placeholder while the Kenney asset is loading.
   // This also hides an already-rendered avatar while it is being replaced.
@@ -229,6 +311,7 @@ async function hydrateAvatarWithKenney(avatar: THREE.Group, appearance: Characte
   const model = cloneSkinnedModel(modelSource) as THREE.Group;
   applyKenneyMaterials(model, appearance, isPlayer);
   if (variant !== `${family}-${appearance.faceVariant}`) applyKenneyFaceVariant(model, faceSource, appearance, isPlayer);
+  if (avatar.userData.district === "district-2") addMoonCharacterDetails(model);
   // Normalize the downloaded model to the same two-unit height as the
   // procedural fallback, keeping movement and camera tuning unchanged.
   const bounds = new THREE.Box3().setFromObject(model);
@@ -271,9 +354,9 @@ function updateAvatarAnimation(avatar: THREE.Group, moving: boolean, running: bo
   avatar.userData.animationState = desired;
 }
 
-function createAvatar(color: number, isPlayer = false, appearance: CharacterProfile = defaultProfile) {
+function createAvatar(color: number, isPlayer = false, appearance: CharacterProfile = defaultProfile, district: DistrictId = "district-1") {
   const avatar = new THREE.Group();
-  avatar.userData = { isPlayer, limbs: [] as THREE.Object3D[], appearanceKey: JSON.stringify(appearance) };
+  avatar.userData = { isPlayer, district, limbs: [] as THREE.Object3D[], appearanceKey: JSON.stringify(appearance) };
   // The procedural meshes below are only a loading placeholder. Keep the
   // avatar hidden until the Kenney model has replaced them.
   avatar.visible = false;
@@ -398,33 +481,132 @@ async function addPlatformerProp(scene: THREE.Scene, name: string, position: [nu
   return prop;
 }
 
+const spacePropLoaders = new Map<string, Promise<THREE.Group | null>>();
+function loadSpaceProp(name: string) {
+  const existing = spacePropLoaders.get(name);
+  if (existing) return existing;
+  const promise = new Promise<THREE.Group | null>((resolve) => {
+    new GLTFLoader().load(
+      `/assets/kenney-space-kit/${name}.glb`,
+      (gltf) => resolve(gltf.scene),
+      undefined,
+      () => resolve(null),
+    );
+  });
+  spacePropLoaders.set(name, promise);
+  return promise;
+}
+
+async function addSpaceProp(scene: THREE.Scene, name: string, position: [number, number, number], scale = 1, rotationY = 0) {
+  const source = await loadSpaceProp(name);
+  if (!source || scene.userData.disposed) return null;
+  const prop = source.clone(true);
+  prop.position.set(...position);
+  prop.scale.setScalar(scale);
+  prop.rotation.y = rotationY;
+  prop.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+  scene.add(prop);
+  return prop;
+}
+
 function isOnSurface(surface: TerrainSurface, x: number, z: number) {
   return Math.abs(x - surface.x) <= surface.halfWidth && Math.abs(z - surface.z) <= surface.halfDepth;
 }
 
-function terrainSurfaceBelow(x: number, z: number, maximumTop: number) {
-  return terrainSurfaces
+function terrainSurfaceBelow(surfaces: TerrainSurface[], x: number, z: number, maximumTop: number) {
+  return surfaces
     .filter((surface) => isOnSurface(surface, x, z) && surface.top <= maximumTop)
     .sort((first, second) => second.top - first.top)[0];
 }
 
-function isTerrainBlocked(x: number, z: number, playerHeight: number) {
-  return terrainSurfaces.some((surface) => surface.raised && isOnSurface(surface, x, z) && playerHeight < surface.top - 0.26);
+function isTerrainBlocked(surfaces: TerrainSurface[], x: number, z: number, playerHeight: number) {
+  return surfaces.some((surface) => surface.raised && isOnSurface(surface, x, z) && playerHeight < surface.top - 0.26);
 }
 
-function buildPlatformTerrain(scene: THREE.Scene) {
+function addMoonCrater(scene: THREE.Scene, x: number, z: number, radius: number, y = 1.012) {
+  const crater = new THREE.Mesh(
+    new THREE.RingGeometry(radius * 0.54, radius, 24),
+    makeMaterial(0x687383, 0.96),
+  );
+  crater.rotation.x = -Math.PI / 2;
+  crater.position.set(x, y, z);
+  crater.receiveShadow = true;
+  scene.add(crater);
+}
+
+function buildMoonTerrain(scene: THREE.Scene, config: DistrictConfig) {
+  const lunarPlate = new THREE.Mesh(new THREE.CylinderGeometry(5.25, 5.55, 0.4, 48), makeMaterial(0x9aa4b2, 0.96));
+  lunarPlate.position.y = 0.8;
+  lunarPlate.receiveShadow = true;
+  scene.add(lunarPlate);
+
+  [[-3.8, -3.6, 0.72], [3.5, -3.15, 0.58], [-3.8, 3.35, 0.52], [3.8, 3.2, 0.8], [0.8, 0.2, 0.42]].forEach(([x, z, radius]) => addMoonCrater(scene, x, z, radius));
+
+  config.terrainSurfaces.filter((surface) => surface.raised).forEach((surface) => {
+    const height = surface.top - 1;
+    const platform = new THREE.Mesh(new THREE.CylinderGeometry(surface.halfWidth, surface.halfWidth * 1.16, height, 12), makeMaterial(0x7e8999, 0.92));
+    platform.position.set(surface.x, 1 + height / 2, surface.z);
+    platform.castShadow = true;
+    platform.receiveShadow = true;
+    scene.add(platform);
+    addMoonCrater(scene, surface.x, surface.z, surface.halfWidth * 0.7, surface.top + 0.012);
+  });
+
+  config.springPads.forEach((spring) => {
+    const pad = addBox(scene, [0.82, 0.08, 0.82], [spring.x, 1.05, spring.z], 0x55d8ed);
+    pad.material.emissive = new THREE.Color(0x0e6f9b);
+    pad.material.emissiveIntensity = 1.1;
+  });
+  config.coinPlacements.forEach((coin) => {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.055, 8, 18), makeMaterial(0xffd66e, 0.28));
+    ring.position.set(coin.x, coin.y, coin.z);
+    ring.rotation.x = Math.PI / 2;
+    ring.material.emissive = new THREE.Color(0x9a5d12);
+    ring.material.emissiveIntensity = 0.7;
+    ring.castShadow = true;
+    ring.userData = { districtCollectible: true };
+    scene.add(ring);
+    (scene.userData.collectibles as THREE.Object3D[]).push(ring);
+  });
+
+  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.9, 10), makeMaterial(0x5cc8e2, 0.3));
+  beacon.position.set(0, 1.95, 0);
+  beacon.material.emissive = new THREE.Color(0x14617c);
+  beacon.material.emissiveIntensity = 1.2;
+  beacon.castShadow = true;
+  scene.add(beacon);
+
+  void addSpaceProp(scene, "machine_generator", [-2.9, 1.05, 3.25], 0.62, 0.35);
+  void addSpaceProp(scene, "satelliteDish", [3.35, 1.02, 3.35], 0.72, -0.45);
+  void addSpaceProp(scene, "meteor_detailed", [-3.8, 1.55, -3.35], 0.42, 0.2);
+  void addSpaceProp(scene, "craterLarge", [2.95, 1.01, -3.55], 0.8, 0.1);
+  void addSpaceProp(scene, "crater", [-3.85, 1.01, 0.15], 0.7, -0.25);
+}
+
+function buildPlatformTerrain(scene: THREE.Scene, district: DistrictId) {
+  const config = districtConfigs[district];
+  scene.userData.terrainSurfaces = config.terrainSurfaces;
+  scene.userData.springs = config.springPads;
   scene.userData.collectibles = [] as THREE.Object3D[];
-  scene.userData.springs = springPads;
+  if (district === "district-2") {
+    buildMoonTerrain(scene, config);
+    return;
+  }
   const tilePositions = [-4.16, 0, 4.16];
   tilePositions.forEach((x) => tilePositions.forEach((z) => void addPlatformerProp(scene, "block-grass-large", [x, 0, z])));
 
-  terrainSurfaces.filter((surface) => surface.raised).forEach((surface, index) => {
+  config.terrainSurfaces.filter((surface) => surface.raised).forEach((surface, index) => {
     const baseY = surface.top - 0.195;
     void addPlatformerProp(scene, "platform", [surface.x, baseY, surface.z], 1, index % 2 ? Math.PI / 2 : 0);
   });
   void addPlatformerProp(scene, "platform-ramp", [0, 1, 3.75], 1, Math.PI);
-  springPads.forEach((spring) => void addPlatformerProp(scene, "spring", [spring.x, 1, spring.z]));
-  coinPlacements.forEach((coin) => {
+  config.springPads.forEach((spring) => void addPlatformerProp(scene, "spring", [spring.x, 1, spring.z]));
+  config.coinPlacements.forEach((coin) => {
     void addPlatformerProp(scene, "coin-gold", [coin.x, coin.y, coin.z]).then((prop) => {
       if (prop) (scene.userData.collectibles as THREE.Object3D[]).push(prop);
     });
@@ -435,14 +617,40 @@ function buildPlatformTerrain(scene: THREE.Scene) {
   });
 }
 
-function buildCity(scene: THREE.Scene) {
-  scene.background = new THREE.Color(0x78b8d0);
-  scene.fog = new THREE.Fog(0x78b8d0, 24, 54);
+function buildSpaceBackdrop(scene: THREE.Scene) {
+  const starPositions = new Float32Array(240 * 3);
+  for (let index = 0; index < 240; index += 1) {
+    const angle = index * 2.39996;
+    const radius = 16 + (index % 17) * 1.7;
+    starPositions[index * 3] = Math.cos(angle) * radius;
+    starPositions[index * 3 + 1] = 5 + (index % 19) * 1.25;
+    starPositions[index * 3 + 2] = -18 + Math.sin(angle) * radius;
+  }
+  const stars = new THREE.Points(
+    new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3)),
+    new THREE.PointsMaterial({ color: 0xd8f4ff, size: 0.08, sizeAttenuation: true }),
+  );
+  scene.add(stars);
 
-  const hemi = new THREE.HemisphereLight(0xe7f7ff, 0x28384d, 2.5);
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(4.5, 24, 16), new THREE.MeshStandardMaterial({ color: 0x294b78, roughness: 0.95 }));
+  planet.position.set(-15, 13, -28);
+  planet.castShadow = true;
+  scene.add(planet);
+
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(4.9, 24, 16), new THREE.MeshBasicMaterial({ color: 0x496d9c, transparent: true, opacity: 0.12, side: THREE.BackSide }));
+  halo.position.copy(planet.position);
+  scene.add(halo);
+}
+
+function buildCity(scene: THREE.Scene, district: DistrictId) {
+  const isMoonDistrict = district === "district-2";
+  scene.background = new THREE.Color(isMoonDistrict ? 0x020716 : 0x78b8d0);
+  scene.fog = new THREE.Fog(isMoonDistrict ? 0x020716 : 0x78b8d0, 24, 54);
+
+  const hemi = new THREE.HemisphereLight(isMoonDistrict ? 0xb8ddff : 0xe7f7ff, isMoonDistrict ? 0x11152d : 0x28384d, isMoonDistrict ? 1.65 : 2.5);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffe2ba, 3.2);
-  sun.position.set(-16, 26, 12);
+  const sun = new THREE.DirectionalLight(isMoonDistrict ? 0xaedcff : 0xffe2ba, isMoonDistrict ? 2.4 : 3.2);
+  sun.position.set(isMoonDistrict ? -10 : -16, 26, isMoonDistrict ? 8 : 12);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.left = -28;
@@ -451,11 +659,17 @@ function buildCity(scene: THREE.Scene) {
   sun.shadow.camera.bottom = -28;
   scene.add(sun);
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), makeMaterial(0x274a67));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), makeMaterial(isMoonDistrict ? 0x080d1d : 0x274a67));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -1.15;
   ground.receiveShadow = true;
   scene.add(ground);
+
+  if (isMoonDistrict) {
+    buildSpaceBackdrop(scene);
+    buildPlatformTerrain(scene, district);
+    return;
+  }
 
   // Distant buildings retain the city identity while the playable area is
   // entirely built from Platformer Kit terrain and props.
@@ -476,13 +690,14 @@ function buildCity(scene: THREE.Scene) {
     }
   });
 
-  buildPlatformTerrain(scene);
+  buildPlatformTerrain(scene, district);
 }
 
 export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const districtMenuRef = useRef<HTMLDivElement>(null);
   const keysRef = useRef<Record<string, boolean>>({});
   const joystickRef = useRef({ x: 0, y: 0, active: false });
   const chatFeedRef = useRef<HTMLDivElement>(null);
@@ -497,6 +712,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
   const [username, setUsername] = useState(initialUsername);
   const [nameDraft, setNameDraft] = useState(initialUsername);
   const [profile, setProfile] = useState<CharacterProfile>(defaultProfile);
+  const [district, setDistrict] = useState<DistrictId>("district-1");
   const [showCreator, setShowCreator] = useState(true);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [sceneReady, setSceneReady] = useState(false);
@@ -504,6 +720,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
   const [chatMessages, setChatMessages] = useState<LobbyMessage[]>([]);
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [districtMenuOpen, setDistrictMenuOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
   const [feedbackComment, setFeedbackComment] = useState("");
@@ -539,6 +756,26 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       document.removeEventListener("keydown", closeMenuOnEscape);
     };
   }, [profileMenuOpen]);
+
+  useEffect(() => {
+    if (!districtMenuOpen) return;
+
+    const closeMenuOnOutsideClick = (event: PointerEvent) => {
+      if (districtMenuRef.current && !districtMenuRef.current.contains(event.target as Node)) {
+        setDistrictMenuOpen(false);
+      }
+    };
+    const closeMenuOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDistrictMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeMenuOnOutsideClick);
+    document.addEventListener("keydown", closeMenuOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenuOnOutsideClick);
+      document.removeEventListener("keydown", closeMenuOnEscape);
+    };
+  }, [districtMenuOpen]);
 
   useEffect(() => {
     if (!gameReady) return;
@@ -672,7 +909,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     if (!scene || !previous) return;
     const position = previous.position.clone();
     scene.remove(previous);
-    const next = createAvatar(profile.outfitColor, true, profile);
+    const next = createAvatar(profile.outfitColor, true, profile, district);
     next.position.copy(position);
     scene.add(next);
     playerRef.current = next;
@@ -715,6 +952,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       const model = cloneSkinnedModel(source) as THREE.Group;
       applyKenneyMaterials(model, profile, true);
       if (bodyVariant !== `${family}-${profile.faceVariant}`) applyKenneyFaceVariant(model, faceSource, profile, true);
+      if (district === "district-2") addMoonCharacterDetails(model);
       const bounds = new THREE.Box3().setFromObject(model);
       const scale = 2.25 / Math.max(bounds.max.y - bounds.min.y, 0.001);
       model.scale.setScalar(scale);
@@ -752,7 +990,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       renderer.dispose();
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
     };
-  }, [profile, showCreator]);
+  }, [profile, showCreator, district]);
 
   // Presence keeps the shared roster durable for late joiners; Broadcast
   // carries movement because positions change much more often than presence.
@@ -872,7 +1110,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       keysRef.current[event.key.toLowerCase()] = true;
       if (event.code === "Space" && (event.target as HTMLElement | null)?.tagName !== "INPUT") {
         if (jumpRef.current.grounded) {
-          jumpRef.current.velocity = 0.15;
+          jumpRef.current.velocity = districtConfigs[district].jumpVelocity;
           jumpRef.current.grounded = false;
         }
         event.preventDefault();
@@ -883,14 +1121,16 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp); };
-  }, [gameReady]);
+  }, [gameReady, district]);
 
   useEffect(() => {
     if (!mountRef.current || !gameReady) return;
     const mount = mountRef.current;
     const scene = new THREE.Scene();
+    const config = districtConfigs[district];
+    const surfaces = config.terrainSurfaces;
     sceneRef.current = scene;
-    buildCity(scene);
+    buildCity(scene, district);
 
     const camera = new THREE.PerspectiveCamera(window.matchMedia("(max-width: 720px)").matches ? 58 : 48, mount.clientWidth / Math.max(mount.clientHeight, 1), 0.1, 120);
     camera.position.set(0, 7, 10);
@@ -901,14 +1141,14 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mount.appendChild(renderer.domElement);
 
-    const player = createAvatar(profile.outfitColor, true, profile);
+    const player = createAvatar(profile.outfitColor, true, profile, district);
     player.position.set(0, 1, 4);
     scene.add(player);
     playerRef.current = player;
     void hydrateAvatarWithKenney(player, profile, true, characterVariant(profile));
     residents.forEach((resident) => {
       const npcAppearance: CharacterProfile = { ...defaultProfile, outfitColor: resident.color, gender: resident.id === "kai" || resident.id === "leo" ? "masculine" : "feminine", bodyVariant: resident.id === "mira" || resident.id === "leo" ? "c" : "a", faceVariant: resident.id === "kai" ? "b" : resident.id === "zoe" ? "c" : "a" };
-      const npc = createAvatar(resident.color, false, npcAppearance);
+      const npc = createAvatar(resident.color, false, npcAppearance, district);
       npc.position.set(resident.position.x, resident.position.y ?? 1, resident.position.z);
       npc.userData.residentId = resident.id;
       npc.userData.ambient = true;
@@ -972,18 +1212,18 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       if (playerRef.current) {
         const player = playerRef.current;
         const length = Math.hypot(x, z) || 1;
-        const speed = running ? 0.13 : 0.07;
+        const speed = running ? config.runSpeed : config.walkSpeed;
         if (moving) {
           const nextX = THREE.MathUtils.clamp(player.position.x + (x / length) * speed, -7, 7);
           const nextZ = THREE.MathUtils.clamp(player.position.z + (z / length) * speed, -7, 7);
-          if (!isTerrainBlocked(nextX, nextZ, player.position.y)) {
+          if (!isTerrainBlocked(surfaces, nextX, nextZ, player.position.y)) {
             player.position.x = nextX;
             player.position.z = nextZ;
             player.rotation.y = Math.atan2(x, z);
           }
         }
         if (jumpRef.current.grounded) {
-          const support = terrainSurfaceBelow(player.position.x, player.position.z, player.position.y + 0.34);
+          const support = terrainSurfaceBelow(surfaces, player.position.x, player.position.z, player.position.y + 0.34);
           if (!support || support.top < player.position.y - 0.34) {
             jumpRef.current.grounded = false;
             jumpRef.current.velocity = -0.04;
@@ -994,9 +1234,9 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
         if (!jumpRef.current.grounded) {
           const previousY = player.position.y;
           player.position.y += jumpRef.current.velocity;
-          jumpRef.current.velocity -= 0.007;
+          jumpRef.current.velocity -= config.gravity;
           if (jumpRef.current.velocity <= 0) {
-            const landing = terrainSurfaces
+            const landing = surfaces
               .filter((surface) => isOnSurface(surface, player.position.x, player.position.z) && surface.top <= previousY + 0.1 && surface.top >= player.position.y - 0.08)
               .sort((first, second) => second.top - first.top)[0];
             if (landing) {
@@ -1013,9 +1253,9 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
           }
         }
         if (jumpRef.current.grounded && elapsed > jumpRef.current.springCooldown) {
-          const spring = springPads.find((pad) => Math.hypot(player.position.x - pad.x, player.position.z - pad.z) < 0.48);
+          const spring = config.springPads.find((pad) => Math.hypot(player.position.x - pad.x, player.position.z - pad.z) < 0.48);
           if (spring) {
-            jumpRef.current.velocity = 0.22;
+            jumpRef.current.velocity = config.springVelocity;
             jumpRef.current.grounded = false;
             jumpRef.current.springCooldown = elapsed + 0.8;
             setNotice("Spring pad! You launched into the air.");
@@ -1054,7 +1294,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
           const target = remote.position;
           npc.position.x = THREE.MathUtils.lerp(npc.position.x, target.x, 0.18);
           npc.position.z = THREE.MathUtils.lerp(npc.position.z, target.z, 0.18);
-          const terrainY = remote.position.y ?? terrainSurfaceBelow(target.x, target.z, Infinity)?.top ?? 1;
+          const terrainY = remote.position.y ?? terrainSurfaceBelow(surfaces, target.x, target.z, Infinity)?.top ?? 1;
           npc.position.y = THREE.MathUtils.lerp(npc.position.y, remote.jumping ? terrainY + 0.32 : terrainY, 0.18);
           npc.rotation.y = THREE.MathUtils.lerp(npc.rotation.y, remote.yaw, 0.18);
           const limbs = npc.userData.limbs as THREE.Object3D[];
@@ -1114,7 +1354,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       setSceneReady(false);
       npcRefs.current = {};
     };
-  }, [gameReady]);
+  }, [gameReady, district]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -1128,12 +1368,13 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
         scene.remove(existing);
         delete npcRefs.current[id];
       }
-      const avatar = npcRefs.current[id] ?? createAvatar(player.appearance.outfitColor, false, player.appearance);
+      const avatar = npcRefs.current[id] ?? createAvatar(player.appearance.outfitColor, false, player.appearance, district);
       avatar.userData.remotePlayer = player;
       avatar.userData.remoteAppearanceKey = appearanceKey;
       avatar.userData.residentId = id;
       if (!npcRefs.current[id]) {
-        avatar.position.set(player.position.x, player.position.y ?? terrainSurfaceBelow(player.position.x, player.position.z, Infinity)?.top ?? 1, player.position.z);
+        const surfaces = scene.userData.terrainSurfaces as TerrainSurface[];
+        avatar.position.set(player.position.x, player.position.y ?? terrainSurfaceBelow(surfaces, player.position.x, player.position.z, Infinity)?.top ?? 1, player.position.z);
         const label = createNameLabel(player.username);
         if (label) avatar.add(label);
         scene.add(avatar);
@@ -1148,7 +1389,7 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
         delete npcRefs.current[id];
       }
     });
-  }, [gameReady, remotePlayers, sceneReady]);
+  }, [gameReady, remotePlayers, sceneReady, district]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -1273,7 +1514,31 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
       <div ref={mountRef} className="city-canvas" aria-label="3D city lobby" />
       <div className="city-vignette" />
       {gameReady && <header className="lobby-header">
-        <div className="lobby-brand"><span className="brand-mark">✦</span><div><strong>NEON DISTRICT</strong><small>social game lobby</small></div></div>
+        <div className="lobby-brand">
+          <span className="brand-mark">✦</span>
+          <div>
+            <strong>NEON DISTRICT</strong>
+            <div className="header-district-picker" ref={districtMenuRef}>
+              <button
+                className="header-district-trigger"
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={districtMenuOpen}
+                onClick={() => setDistrictMenuOpen((open) => !open)}
+              >
+                <span>{districtConfigs[district].label}</span><b>⌄</b>
+              </button>
+              {districtMenuOpen && <div className="header-district-menu" role="menu">
+                <button className={`header-district-option ${district === "district-1" ? "selected" : ""}`} role="menuitem" type="button" onClick={() => { setDistrict("district-1"); setNotice(`Traveling to ${districtConfigs["district-1"].label}.`); setDistrictMenuOpen(false); }}>
+                  {districtConfigs["district-1"].label}
+                </button>
+                <button className={`header-district-option ${district === "district-2" ? "selected" : ""}`} role="menuitem" type="button" onClick={() => { setDistrict("district-2"); setNotice(`Traveling to ${districtConfigs["district-2"].label}.`); setDistrictMenuOpen(false); }}>
+                  {districtConfigs["district-2"].label}
+                </button>
+              </div>}
+            </div>
+          </div>
+        </div>
         <div className="lobby-status"><span className="live-dot" /> {realtimeStatus === "online" ? `${Object.keys(remotePlayers).length + 1} players online` : realtimeStatus === "connecting" ? "Connecting to city..." : "Offline preview"}</div>
         <div className="lobby-fps" aria-label={fps === null ? "Frames per second: measuring" : `Frames per second: ${fps}`}>FPS {fps ?? "—"}</div>
         {gameReady && activeRoom && <button className="rejoin-game-button" onClick={() => window.location.assign(`/battleship?room=${encodeURIComponent(activeRoom.id)}`)}><span>↻</span> Rejoin Battleship</button>}
@@ -1302,14 +1567,19 @@ export function CityLobby({ initialUsername, onUsernameChange }: CityLobbyProps)
           <div className="resident-avatar" style={{ backgroundColor: `#${selected.color.toString(16).padStart(6, "0")}` }}>{selected.name.slice(0, 1)}</div>
           {interactionMode === "profile" ? <>
             <p className="eyebrow">PLAYER PROFILE</p><h2>{selected.name}</h2><p className="resident-role">{selected.role}</p><p className="resident-mood">“{selected.mood}”</p>
-            <div className="interaction-actions game-actions"><button onClick={() => setGameMenuOpen((open) => !open)}>Start a game <span>↗</span></button>{gameMenuOpen && <div className="game-picker"><p className="game-picker-label">AVAILABLE GAMES</p><button className="game-option" onClick={() => void sendGameInvitation("battleship")}><span><strong>Battleship</strong><small>Naval strategy · 2 players</small></span><b>Invite →</b></button></div>}<button onClick={() => setInteractionMode("messages")}>Send a message <span>⌁</span></button><button onClick={() => interact("Party invite")}>Invite to party <span>+</span></button></div>
+            <div className="interaction-actions game-actions"><button onClick={() => setGameMenuOpen((open) => !open)}>Start a game <span>↗</span></button>{gameMenuOpen && <div className="game-picker"><label className="district-picker" htmlFor="district-select"><span>SELECT DISTRICT</span><select id="district-select" value={district} onChange={(event) => { const nextDistrict = event.target.value as DistrictId; setDistrict(nextDistrict); setNotice(`Traveling to ${districtConfigs[nextDistrict].label}.`); }}><option value="district-1">District 1 · Neon City</option><option value="district-2">District 2 · Moon Base</option></select></label><p className="game-picker-label">AVAILABLE GAMES</p><button className="game-option" onClick={() => void sendGameInvitation("battleship")}><span><strong>Battleship</strong><small>Naval strategy · 2 players</small></span><b>Invite →</b></button></div>}<button onClick={() => setInteractionMode("messages")}>Send a message <span>⌁</span></button><button onClick={() => interact("Party invite")}>Invite to party <span>+</span></button></div>
           </> : <>
             <p className="eyebrow">CHOOSE A MESSAGE</p><h2>Say hello</h2><p className="resident-mood">Pick a quick message to send to {selected.name}.</p>
             <div className="interaction-actions message-actions">{messages.map((message) => <button key={message} onClick={() => sendLobbyMessage(message)}>{message} <span>→</span></button>)}<button onClick={() => setInteractionMode("profile")}>Back to profile <span>←</span></button></div>
           </>}
         </> : <div className="interaction-empty"><span className="cursor-icon">⌁</span><strong>Meet someone</strong><p>Click a character in the city to see interaction options.</p></div>}
         </aside>
-        <div className="movement-hint"><kbd>W</kbd><kbd>S</kbd><span>move</span><kbd>A</kbd><kbd>D</kbd><span>turn</span><kbd>⇧</kbd><span>run</span><kbd className="space-key">SPACE</kbd><span>jump · springs launch · coins collect</span></div>
+        <div className="movement-hint">
+          <div className="movement-control-group"><div className="movement-control-keys"><kbd>W</kbd><kbd>S</kbd></div><span>move</span></div>
+          <div className="movement-control-group"><div className="movement-control-keys"><kbd>A</kbd><kbd>D</kbd></div><span>turn</span></div>
+          <div className="movement-control-group"><kbd>⇧</kbd><span>run</span></div>
+          <div className="movement-control-group"><kbd className="space-key">SPACE</kbd><span>jump · springs launch · coins collect</span></div>
+        </div>
         <div className="mobile-joystick" onPointerMove={updateJoystick} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); updateJoystick(event); }} onPointerUp={endJoystick} onPointerCancel={endJoystick} aria-label="Movement joystick"><div className="joystick-ring"><div className="joystick-thumb" style={{ transform: `translate(${joystickPosition.x}px, ${joystickPosition.y}px)` }} /></div></div>
         <div className={`movement-state ${isMoving ? "moving" : ""}`}>{isMoving ? (isRunning ? "RUNNING" : "WALKING") : "IDLE"}</div>
       </>}

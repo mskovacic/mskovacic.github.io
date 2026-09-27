@@ -9,10 +9,19 @@
 .lobby-header, .lobby-intro, .city-notice, .chat-feed, .interaction-card, .movement-hint, .movement-state, .mobile-joystick { position: absolute; z-index: 2; }
 .lobby-header { top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 24px; padding: 25px clamp(20px, 5vw, 72px); border-bottom: 1px solid rgba(218, 242, 235, .16); background: linear-gradient(180deg, rgba(12, 35, 44, .76), transparent); }
 .lobby-brand { display: flex; align-items: center; gap: 11px; letter-spacing: .11em; }
+.lobby-brand > div { display: grid; gap: 5px; }
 .brand-mark { display: grid; place-items: center; width: 31px; height: 31px; border: 1px solid #d5eddf; border-radius: 50%; color: #ffd179; font-size: 16px; }
 .lobby-brand strong { display: block; font: 700 13px/1 'Urbanist', sans-serif; }
 .lobby-brand small { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; letter-spacing: .13em; text-transform: uppercase; }
 .lobby-status { margin-left: auto; color: #cbe1dc; font-size: 12px; letter-spacing: .04em; }
+.header-district-picker { position: relative; display: flex; align-items: center; gap: 7px; color: #8eafaa; font-size: 8px; font-weight: 700; letter-spacing: .14em; white-space: nowrap; }
+.header-district-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 142px; border: 1px solid rgba(255, 209, 126, .35); border-radius: 2px; padding: 7px 8px; outline: none; background: rgba(24, 59, 73, .88); color: #edf8f4; font: 600 10px 'Open Sans', sans-serif; text-align: left; cursor: pointer; }
+.header-district-trigger:hover, .header-district-trigger:focus-visible { border-color: #ffd17e; box-shadow: 0 0 0 2px rgba(255, 209, 126, .1); }
+.header-district-trigger span { overflow: hidden; text-overflow: ellipsis; }
+.header-district-trigger b { color: #ffd17e; font-size: 14px; font-weight: 400; line-height: .7; }
+.header-district-menu { position: absolute; z-index: 8; top: calc(100% + 6px); left: 0; display: grid; width: 190px; padding: 5px; border: 1px solid rgba(231, 247, 239, .25); border-radius: 3px; background: rgba(13, 37, 50, .97); box-shadow: 0 16px 35px rgba(3, 17, 27, .45); backdrop-filter: blur(12px); }
+.header-district-option { border: 1px solid transparent; border-radius: 2px; padding: 8px 9px; background: transparent; color: #dceee8; font: 600 10px 'Open Sans', sans-serif; text-align: left; cursor: pointer; }
+.header-district-option:hover, .header-district-option:focus-visible, .header-district-option.selected { border-color: rgba(255, 209, 126, .45); background: rgba(255, 209, 126, .12); color: #fff1cf; outline: none; }
 .lobby-fps { color: #a9c8c3; font: 600 10px 'Open Sans', sans-serif; letter-spacing: .08em; white-space: nowrap; }
 .rejoin-game-button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255, 209, 126, .55); border-radius: 999px; padding: 8px 12px; background: rgba(255, 209, 126, .14); color: #ffe0a5; font: 700 10px 'Open Sans', sans-serif; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
 .rejoin-game-button:hover { background: rgba(255, 209, 126, .24); }
@@ -33,9 +42,9 @@
 .lobby-intro h1 { margin: 0; font: 500 clamp(32px, 4.5vw, 58px)/.96 'Urbanist', sans-serif; letter-spacing: -.055em; }
 .lobby-intro h1 em, .username-modal h2 em { color: #ffd17e; font-family: Georgia, serif; font-weight: 400; }
 .intro-copy { max-width: 280px; margin-top: 19px; color: #bdd5d1; font-size: 13px; line-height: 1.7; }
-.city-notice { bottom: 29px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 11px 17px; border: 1px solid rgba(195, 229, 217, .16); border-radius: 100px; background: rgba(16, 43, 52, .7); color: #c1dad4; font-size: 11px; backdrop-filter: blur(9px); white-space: nowrap; }
+.city-notice { bottom: 29px; left: 50%; width: clamp(220px, 28vw, 360px); max-width: calc(100vw - 40px); box-sizing: border-box; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; gap: 10px; padding: 11px 17px; border: 1px solid rgba(195, 229, 217, .16); border-radius: 100px; background: rgba(16, 43, 52, .7); color: #c1dad4; font-size: 11px; line-height: 1.4; text-align: center; backdrop-filter: blur(9px); white-space: normal; }
 .notice-pulse { width: 6px; height: 6px; background: #ffd17e; box-shadow: none; }
-.chat-feed { left: clamp(20px, 5vw, 72px); bottom: 27px; width: min(335px, calc(100vw - 40px)); overflow: hidden; border: 1px solid rgba(195, 229, 217, .18); border-radius: 4px; background: rgba(12, 35, 44, .76); box-shadow: 0 18px 45px rgba(4, 18, 24, .24); backdrop-filter: blur(13px); }
+.chat-feed { left: clamp(20px, 5vw, 72px); bottom: 27px; width: min(335px, calc(100vw - 40px)); overflow: hidden; border: 1px solid rgba(195, 229, 217, .18); border-right: 0; border-radius: 4px; background: linear-gradient(90deg, rgba(12, 35, 44, 1) 0%, rgba(12, 35, 44, 0) 100%); box-shadow: 0 18px 45px rgba(4, 18, 24, .24); backdrop-filter: blur(13px); }
 .chat-feed-header { display: flex; align-items: center; gap: 8px; padding: 11px 14px 10px; border-bottom: 1px solid rgba(195, 229, 217, .13); color: #d9eee6; font-size: 9px; font-weight: 700; letter-spacing: .16em; }
 .chat-feed-header .live-dot { width: 5px; height: 5px; box-shadow: none; }
 .chat-feed-header small { margin-left: auto; color: #8eafaa; font-size: 9px; font-weight: 400; letter-spacing: .02em; }
@@ -62,6 +71,10 @@
 .game-actions { position: relative; }
 .game-picker { position: absolute; z-index: 3; right: 0; bottom: calc(100% + 8px); left: 0; padding: 10px; border: 1px solid rgba(211, 237, 228, .2); border-radius: 3px; background: rgba(12, 31, 40, .96); box-shadow: 0 15px 35px rgba(2, 14, 20, .4); }
 .game-picker-label { margin: 1px 3px 8px; color: #8eafaa; font-size: 8px; font-weight: 700; letter-spacing: .17em; }
+.district-picker { display: grid; gap: 5px; margin-bottom: 10px; }
+.district-picker > span { color: #8eafaa; font-size: 8px; font-weight: 700; letter-spacing: .17em; }
+.district-picker select { width: 100%; border: 1px solid rgba(255, 209, 126, .35); border-radius: 2px; padding: 8px 9px; outline: none; background: #183b49; color: #edf8f4; font: 600 10px 'Open Sans', sans-serif; cursor: pointer; }
+.district-picker select:focus { border-color: #ffd17e; box-shadow: 0 0 0 2px rgba(255, 209, 126, .1); }
 .game-option { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 1px solid rgba(255, 209, 126, .32); border-radius: 2px; padding: 11px 10px; background: rgba(255, 209, 126, .1); color: #edf8f4; text-align: left; cursor: pointer; }
 .game-option:hover { border-color: #ffd17e; background: rgba(255, 209, 126, .18); }
 .game-option strong, .game-option small { display: block; }
@@ -74,9 +87,11 @@
 .interaction-empty p { margin: 7px 0 0; }
 .cursor-icon { display: grid; place-items: center; width: 45px; height: 45px; margin: 0 auto; border: 1px dashed #87bbb2; border-radius: 50%; color: #ffd17e; font-size: 20px; }
 .movement-hint { right: clamp(20px, 5vw, 72px); bottom: 29px; display: flex; align-items: center; gap: 5px; color: #a8c4c0; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; }
+.movement-control-group { display: flex; align-items: center; gap: 5px; }
+.movement-control-keys { display: flex; gap: 5px; }
 .movement-hint kbd { display: grid; place-items: center; width: 19px; height: 19px; border: 1px solid rgba(203, 230, 221, .3); border-radius: 3px; background: rgba(19, 49, 59, .75); color: #eaf8f2; font-size: 10px; }
 .movement-hint .space-key { width: 43px; font-size: 8px; }
-.movement-hint span { margin: 0 9px 0 2px; }
+.movement-control-group > span { margin: 0 9px 0 2px; }
 .movement-state { top: 89px; right: clamp(20px, 5vw, 72px); color: #9dc4bf; font-size: 9px; letter-spacing: .22em; }
 .movement-state.moving { color: #ffd17e; }
 .mobile-joystick { display: none; bottom: 38px; left: 28px; width: 100px; height: 100px; touch-action: none; }
@@ -183,6 +198,8 @@
   .lobby-loading { height: calc(100vh - 56px); height: calc(100dvh - 56px); }
   .lobby-header { padding: 17px 18px; gap: 10px; }
   .lobby-status { margin-left: auto; font-size: 10px; }
+  .header-district-picker { gap: 4px; font-size: 7px; }
+  .header-district-trigger { width: 104px; padding: 5px 6px; font-size: 8px; }
   .rejoin-game-button { padding: 7px 9px; font-size: 8px; }
   .lobby-user { display: inline-flex; }
   .lobby-user-name { display: none; }
@@ -230,4 +247,106 @@
   .feedback-comment { min-height: 55px; padding: 8px 10px; font-size: 12px; }
   .feedback-actions { margin-top: 9px; }
   .feedback-actions button { padding: 8px 11px; }
+}
+@media (min-width: 721px) and (max-height: 720px) {
+  .lobby-header { gap: 14px; padding: 13px 28px; }
+  .lobby-brand { gap: 8px; }
+  .brand-mark { width: 26px; height: 26px; font-size: 14px; }
+  .lobby-brand strong { font-size: 11px; }
+  .lobby-brand small { margin-top: 3px; font-size: 7px; }
+  .lobby-status { font-size: 10px; }
+  .header-district-picker { gap: 4px; font-size: 7px; }
+  .header-district-trigger { width: 104px; padding: 5px 6px; font-size: 8px; }
+  .lobby-fps { font-size: 9px; }
+  .rejoin-game-button { padding: 6px 9px; font-size: 8px; }
+  .mini-avatar { width: 24px; height: 24px; }
+  .lobby-user { gap: 7px; font-size: 10px; }
+  .lobby-intro { top: 86px; left: 28px; max-width: 280px; }
+  .lobby-intro h1 { font-size: 43px; }
+  .intro-copy { max-width: 235px; margin-top: 12px; font-size: 11px; line-height: 1.45; }
+  .movement-state { top: 66px; right: 28px; font-size: 8px; }
+  .city-notice { bottom: 14px; width: clamp(180px, 26vw, 300px); max-width: calc(100vw - 36px); overflow: hidden; padding: 8px 12px; font-size: 9px; line-height: 1.35; text-align: center; white-space: normal; }
+  .chat-feed { left: 18px; bottom: 14px; width: min(275px, calc(100vw - 36px)); }
+  .chat-feed-header { gap: 6px; padding: 8px 10px 7px; font-size: 8px; }
+  .chat-feed-header small { font-size: 8px; }
+  .chat-feed-list { max-height: 112px; padding: 7px 8px 8px; }
+  .chat-message { margin-bottom: 6px; padding: 6px 7px; }
+  .chat-message-meta strong { font-size: 9px; }
+  .chat-message-meta time, .chat-message p { font-size: 9px; }
+  .chat-message p { margin-top: 3px; line-height: 1.35; }
+  .interaction-card { right: 28px; width: min(250px, calc(100vw - 56px)); padding: 19px; }
+  .close-card { top: 8px; right: 10px; font-size: 20px; }
+  .resident-avatar { width: 44px; height: 44px; margin-bottom: 13px; font-size: 18px; }
+  .interaction-card h2 { font-size: 25px; }
+  .resident-role { margin: 5px 0; font-size: 9px; }
+  .resident-mood { margin: 11px 0 14px; font-size: 12px; }
+  .interaction-actions { gap: 5px; }
+  .interaction-actions button { padding: 9px 10px; font-size: 10px; }
+  .interaction-actions span { font-size: 15px; }
+  .game-picker { padding: 7px; }
+  .district-picker { gap: 3px; margin-bottom: 6px; }
+  .district-picker select { padding: 6px 7px; font-size: 9px; }
+  .game-picker-label { margin-bottom: 5px; }
+  .game-option { padding: 8px; }
+  .game-option strong { font-size: 10px; }
+  .game-option small { margin-top: 2px; font-size: 8px; }
+  .game-invite-modal { padding: 22px 23px 19px; }
+  .game-invite-modal h2 { font-size: 23px; }
+  .game-invite-modal > p:not(.eyebrow) { margin: 10px 0 17px; font-size: 11px; }
+  .invite-icon { width: 36px; height: 36px; margin-bottom: 12px; font-size: 16px; }
+  .invite-actions button { padding: 9px; font-size: 10px; }
+  .movement-hint { right: 18px; bottom: 13px; display: grid; grid-template-columns: max-content max-content; grid-template-rows: repeat(3, max-content); gap: 3px 10px; padding: 7px 9px; border: 1px solid rgba(195, 229, 217, .16); border-radius: 3px; background: rgba(16, 43, 52, .7); font-size: 8px; backdrop-filter: blur(9px); }
+  .movement-control-group { gap: 3px; }
+  .movement-control-keys { gap: 3px; }
+  .movement-control-group > span { margin: 0 6px 0 1px; }
+  .movement-hint kbd { width: 16px; height: 16px; font-size: 8px; }
+  .movement-hint .space-key { width: 35px; font-size: 7px; }
+  .movement-control-group:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .movement-control-group:nth-child(2) { grid-column: 2; grid-row: 1; }
+  .movement-control-group:nth-child(3) { grid-column: 1 / -1; grid-row: 2; }
+  .movement-control-group:nth-child(4) { grid-column: 1 / -1; grid-row: 3; }
+  .movement-control-group:nth-child(4) > span { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+@media (max-width: 720px) and (max-height: 720px) {
+  .lobby-header { gap: 7px; padding: 10px 13px; }
+  .lobby-brand { gap: 6px; }
+  .brand-mark { width: 24px; height: 24px; font-size: 13px; }
+  .lobby-brand strong { font-size: 10px; }
+  .lobby-brand small { display: none; }
+  .lobby-status { font-size: 8px; }
+  .header-district-trigger { width: 92px; padding: 4px 5px; font-size: 7px; }
+  .header-district-trigger b { font-size: 11px; }
+  .lobby-fps { font-size: 8px; }
+  .rejoin-game-button { padding: 5px 7px; font-size: 7px; }
+  .mini-avatar { width: 23px; height: 23px; }
+  .lobby-intro { top: 68px; left: 14px; max-width: 225px; }
+  .lobby-intro h1 { font-size: 32px; }
+  .intro-copy { max-width: 190px; margin-top: 10px; font-size: 10px; line-height: 1.4; }
+  .movement-state { top: 58px; right: 14px; font-size: 8px; }
+  .city-notice { bottom: 12px; width: min(220px, calc(100% - 116px)); max-width: calc(100% - 116px); padding: 7px 10px; font-size: 9px; line-height: 1.35; text-align: center; white-space: normal; }
+  .chat-feed { right: 12px; bottom: 111px; left: 12px; width: auto; }
+  .chat-feed-header { padding: 8px 10px 7px; font-size: 8px; }
+  .chat-feed-list { max-height: 87px; padding: 7px 8px 8px; }
+  .chat-message { margin-bottom: 5px; padding: 6px 7px; }
+  .chat-message-meta strong, .chat-message-meta time, .chat-message p { font-size: 8px; }
+  .chat-message p { margin-top: 2px; line-height: 1.3; }
+  .interaction-card { right: 12px; bottom: 69px; left: 12px; padding: 15px; }
+  .close-card { top: 7px; right: 9px; font-size: 20px; }
+  .resident-avatar { width: 38px; height: 38px; margin-bottom: 10px; font-size: 16px; }
+  .interaction-card h2 { font-size: 22px; }
+  .resident-role { margin: 4px 0; font-size: 8px; }
+  .resident-mood { margin: 8px 0 11px; font-size: 11px; }
+  .interaction-actions { gap: 4px; }
+  .interaction-actions button { padding: 8px 9px; font-size: 10px; }
+  .interaction-actions span { font-size: 14px; }
+  .district-picker { gap: 3px; margin-bottom: 6px; }
+  .district-picker select { padding: 6px 7px; font-size: 9px; }
+  .mobile-joystick { bottom: 15px; left: 15px; width: 78px; height: 78px; }
+  .joystick-thumb { width: 33px; height: 33px; }
+  .game-invite-modal { padding: 20px 18px 17px; }
+  .game-invite-modal h2 { font-size: 22px; }
+  .game-invite-modal > p:not(.eyebrow) { margin: 9px 0 15px; font-size: 11px; }
+  .invite-icon { width: 34px; height: 34px; margin-bottom: 10px; font-size: 15px; }
+  .invite-actions button { padding: 8px; font-size: 10px; }
+  .feedback-modal { padding: 18px 20px 16px; }
 }
