@@ -2,7 +2,7 @@ import Chatbot from '~/components/chat/chatbot';
 import { type Route } from './+types/chat';
 import 'react-toastify/dist/ReactToastify.css';
 import { toast } from 'react-toastify';
-import { useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 
 export function clientLoader({ params }: Route.ClientLoaderArgs) {
     console.log("clientLoader called with params:", params);
@@ -10,7 +10,8 @@ export function clientLoader({ params }: Route.ClientLoaderArgs) {
 }
 
 export default function Chat({ loaderData }: Route.ComponentProps) {
-    console.log("Chat component rendered with loaderData:", loaderData);
+    const [searchParams] = useSearchParams();
+    console.log("Chat component rendered with loaderData:", loaderData, searchParams.toString());
     if (false) {
         toast.error(`Request limit reached! Please try-again in ${1000} seconds!`, {
         position: "top-right",

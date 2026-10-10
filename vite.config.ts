@@ -6,7 +6,6 @@ import { reactRouterDevTools } from 'react-router-devtools'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  envDir: false,
   server: {
     port: 3000,
   },
